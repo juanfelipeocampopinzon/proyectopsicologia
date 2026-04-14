@@ -1,0 +1,39 @@
+name: Deploy Frontend to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'backend/**' # Desplegará cuando se modifique cualquier cosa EXCEPTO el backend
+      - '.github/**'
+
+env:
+  PROJECT_ID: microservicio-471115
+  REGION: us-central1
+  SERVICE_NAME: lumen
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      # Autenticación automática y segura con Google Cloud
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+      - name: 'Deploy a Cloud Run'
+        uses: 'google-github-actions/deploy-cloudrun@v2'
+        with:
+          service: '${{ env.SERVICE_NAME }}'
+          region: '${{ env.REGION }}'
+          source: '.' # Ejecuta Google Cloud Buildpacks sobre la raíz (Next.js)
+          flags: '--allow-unauthenticated'
