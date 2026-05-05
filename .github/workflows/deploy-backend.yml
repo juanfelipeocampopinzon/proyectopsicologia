@@ -39,6 +39,7 @@ jobs:
         run: gcloud auth configure-docker $REGION-docker.pkg.dev
 
       - name: 'Cloud Run Deploy – Gemini Service'
+        id: deploy
         uses: 'google-github-actions/deploy-cloudrun@v2'
         with:
           service: '${{ env.SERVICE_NAME }}'
@@ -47,4 +48,10 @@ jobs:
           env_vars: |
             PROJECT_ID=${{ env.PROJECT_ID }}
             LOCATION=${{ env.REGION }}
-          flags: '--allow-unauthenticated'
+
+      - name: 'Make Service Public (Allow Unauthenticated)'
+        run: |
+          gcloud run services add-iam-policy-binding ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --member="allUsers" \
+            --role="roles/run.invoker"

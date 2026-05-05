@@ -38,6 +38,7 @@ jobs:
         run: gcloud auth configure-docker $REGION-docker.pkg.dev
 
       - name: 'Cloud Run Deploy – BigQuery Service'
+        id: deploy
         uses: 'google-github-actions/deploy-cloudrun@v2'
         with:
           service: '${{ env.SERVICE_NAME }}'
@@ -47,4 +48,10 @@ jobs:
             PROJECT_ID=${{ env.PROJECT_ID }}
             BQ_DATASET=psicologia_data
             BQ_TABLE=chat_logs
-          flags: '--allow-unauthenticated'
+
+      - name: 'Make Service Public (Allow Unauthenticated)'
+        run: |
+          gcloud run services add-iam-policy-binding ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --member="allUsers" \
+            --role="roles/run.invoker"
