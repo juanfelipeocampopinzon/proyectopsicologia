@@ -1,16 +1,16 @@
-name: Deploy Backend to Cloud Run
+name: Deploy Gemini Service to Cloud Run
 
 on:
   push:
     branches:
       - main
     paths:
-      - 'backend/**' # Solo se dispara si cambia algo en el backend
+      - 'backend/gemini-service/**' # Solo se dispara si cambia algo en el microservicio Gemini
 
 env:
   PROJECT_ID: microservicio-471115
   REGION: us-central1
-  SERVICE_NAME: psicologia-backend
+  SERVICE_NAME: psicologia-gemini-service
   WORKLOAD_IDENTITY_PROVIDER: 'projects/123456789/locations/global/workloadIdentityPools/mi-pool/providers/mi-proveedor' # Opcional: Reemplazar por GitHub Workload Identity
   SERVICE_ACCOUNT: 'tu-service-account@microservicio-471115.iam.gserviceaccount.com'
 
@@ -34,16 +34,16 @@ jobs:
 
       - name: 'Setup Cloud SDK'
         uses: 'google-github-actions/setup-gcloud@v2'
-        
+
       - name: Configurar Docker para Artifact Registry
         run: gcloud auth configure-docker $REGION-docker.pkg.dev
 
-      - name: 'Cloud Run Deploy del Backend'
+      - name: 'Cloud Run Deploy – Gemini Service'
         uses: 'google-github-actions/deploy-cloudrun@v2'
         with:
           service: '${{ env.SERVICE_NAME }}'
           region: '${{ env.REGION }}'
-          source: './backend' 
+          source: './backend/gemini-service'
           env_vars: |
             PROJECT_ID=${{ env.PROJECT_ID }}
             LOCATION=${{ env.REGION }}

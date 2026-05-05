@@ -12,9 +12,9 @@ app.use(express.json());
 const project = process.env.PROJECT_ID || 'microservicio-471115';
 // Google confirmó en 2026 que Gemini 1.5 es "legacy" cerrando acceso a nuevos proyectos.
 // Gemini 2.5 Pro se debe acceder usando la región "global"
-const location = 'global'; 
+const location = 'global';
 
-// Instanciamos usando el modo vertexai con la nueva SDK (El objeto correcto es al mismo nivel)
+// Instanciamos usando el modo vertexai con la nueva SDK
 const ai = new GoogleGenAI({ vertexai: true, project: project, location: location });
 const modelName = 'gemini-2.5-pro';
 
@@ -22,8 +22,8 @@ const systemInstruction = "Eres un psicólogo profesional, empático y experto. 
 
 app.post('/api/chat', async (req, res) => {
   try {
-    const { messages } = req.body; 
-    
+    const { messages } = req.body;
+
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'La solicitud debe contener un arreglo de mensajes' });
     }
@@ -44,9 +44,9 @@ app.post('/api/chat', async (req, res) => {
 
     const botResponse = response.text;
 
-    return res.json({ 
-      success: true, 
-      response: botResponse 
+    return res.json({
+      success: true,
+      response: botResponse
     });
 
   } catch (error) {
@@ -57,6 +57,6 @@ app.post('/api/chat', async (req, res) => {
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-  console.log(`🧠 Microservicio Psicólogo (Backend) corriendo en http://localhost:${PORT}`);
+  console.log(`🧠 Microservicio Gemini Psicólogo corriendo en http://localhost:${PORT}`);
   console.log(`🔌 Conectado a Vertex AI Project: ${project} en ${location} usando Google Gen AI SDK`);
 });

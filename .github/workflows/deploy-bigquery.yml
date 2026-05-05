@@ -1,0 +1,50 @@
+name: Deploy BigQuery Service to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/bigquery-service/**' # Solo se dispara si cambia algo en el microservicio BigQuery
+
+env:
+  PROJECT_ID: microservicio-471115
+  REGION: us-central1
+  SERVICE_NAME: psicologia-bigquery-service
+  WORKLOAD_IDENTITY_PROVIDER: 'projects/123456789/locations/global/workloadIdentityPools/mi-pool/providers/mi-proveedor' # Opcional: Reemplazar por GitHub Workload Identity
+  SERVICE_ACCOUNT: 'tu-service-account@microservicio-471115.iam.gserviceaccount.com'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      # Nota: el secreto 'GCP_CREDENTIALS' debe ser agregado en los Secrets de GitHub
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+      - name: 'Setup Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v2'
+
+      - name: Configurar Docker para Artifact Registry
+        run: gcloud auth configure-docker $REGION-docker.pkg.dev
+
+      - name: 'Cloud Run Deploy – BigQuery Service'
+        uses: 'google-github-actions/deploy-cloudrun@v2'
+        with:
+          service: '${{ env.SERVICE_NAME }}'
+          region: '${{ env.REGION }}'
+          source: './backend/bigquery-service'
+          env_vars: |
+            PROJECT_ID=${{ env.PROJECT_ID }}
+            BQ_DATASET=psicologia_data
+            BQ_TABLE=chat_logs
+          flags: '--allow-unauthenticated'

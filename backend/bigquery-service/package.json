@@ -1,14 +1,14 @@
 {
-  "name": "psicologia-backend",
+  "name": "bigquery-service",
   "version": "1.0.0",
-  "description": "Microservicio de IA con Vertex AI (Gemini 2.5 Pro) para chatbot de psicología",
+  "description": "Microservicio de logging en BigQuery para el proyecto de psicología",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js"
   },
   "dependencies": {
-    "@google-cloud/vertexai": "^1.9.3",
+    "@google-cloud/bigquery": "^8.3.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2"
