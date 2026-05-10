@@ -9,12 +9,16 @@ import { Send, Sparkles, Phone, Mic, Smile } from "lucide-react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
+import { db, auth } from "@/lib/firebase"
+import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, Timestamp } from "firebase/firestore"
+import { onAuthStateChanged } from "firebase/auth"
+import { useRouter } from "next/navigation"
 
 interface Message {
   id: string
   role: "user" | "assistant"
   content: string
-  timestamp: Date
+  timestamp: Date | Timestamp
 }
 
 const quickReplies = [
@@ -25,23 +29,67 @@ const quickReplies = [
 ]
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      role: "assistant",
-      content:
-        "Hola, soy LUMEN. Estoy aqui para escucharte sin juzgar. ¿Como te sientes hoy?",
-      timestamp: new Date(),
-    },
-  ])
+  const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isTyping, setIsTyping] = useState(false)
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const router = useRouter()
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
+
+  // Verificar autenticación
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+        setLoading(false);
+      } else {
+        router.push("/login");
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+  // Cargar mensajes desde Firestore filtrados por usuario
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(
+      collection(db, "users", user.uid, "chat_history"), 
+      orderBy("timestamp", "asc")
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const loadedMessages = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          role: data.role,
+          content: data.content,
+          timestamp: data.timestamp instanceof Timestamp ? data.timestamp.toDate() : new Date(),
+        } as Message;
+      });
+      
+      if (loadedMessages.length === 0) {
+        setMessages([{
+          id: "welcome",
+          role: "assistant",
+          content: `Hola ${user.displayName || ""}, soy LUMEN. Estoy aqui para escucharte sin juzgar. ¿Como te sientes hoy?`,
+          timestamp: new Date()
+        }]);
+      } else {
+        setMessages(loadedMessages);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user])
 
   useEffect(() => {
     scrollToBottom()
@@ -49,37 +97,81 @@ export default function ChatPage() {
 
   const handleSend = async (text?: string) => {
     const messageText = text || input
-    if (!messageText.trim()) return
+    if (!messageText.trim() || !user) return
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: "user",
+    const userMessageData = {
+      role: "user" as const,
       content: messageText,
-      timestamp: new Date(),
+      timestamp: serverTimestamp(),
     }
 
-    setMessages((prev) => [...prev, userMessage])
-    setInput("")
-    setIsTyping(true)
+    try {
+      setInput("")
+      setIsTyping(true)
 
-    setTimeout(() => {
-      const responses = [
-        "Entiendo como te sientes. Es completamente valido. ¿Quieres contarme mas?",
-        "Gracias por compartir esto conmigo. Tus sentimientos importan. ¿Que te gustaria explorar?",
-        "Estoy aqui contigo. Expresar lo que sentimos es el primer paso. ¿Como puedo ayudarte?",
-        "Te escucho. Recuerda que esta bien no estar bien. ¿Hay algo especifico que te preocupa?",
-      ]
+      // 1. Guardar en Firestore privado
+      await addDoc(collection(db, "users", user.uid, "chat_history"), userMessageData);
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
+      // 2. Registrar en BigQuery
+      fetch('http://localhost:8081/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.uid,
+          role: "user",
+          content: messageText,
+          timestamp: new Date().toISOString()
+        })
+      }).catch(err => console.error("Error logging to BigQuery:", err));
+
+      // 3. Obtener respuesta de Gemini Service
+      const response = await fetch('http://localhost:8080/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: messages.concat({ id: "temp", role: "user", content: messageText, timestamp: new Date() })
+            .map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }))
+        })
+      });
+
+      const data = await response.json();
+      const botResponse = data.response || "Lo siento, tuve un problema al procesar tu mensaje.";
+
+      // 4. Guardar respuesta del asistente en Firestore privado
+      await addDoc(collection(db, "users", user.uid, "chat_history"), {
         role: "assistant",
-        content: responses[Math.floor(Math.random() * responses.length)],
-        timestamp: new Date(),
-      }
+        content: botResponse,
+        timestamp: serverTimestamp(),
+      });
 
-      setMessages((prev) => [...prev, assistantMessage])
+      // 5. Registrar respuesta en BigQuery
+      fetch('http://localhost:8081/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.uid,
+          role: "assistant",
+          content: botResponse,
+          timestamp: new Date().toISOString()
+        })
+      }).catch(err => console.error("Error logging assistant to BigQuery:", err));
+
+    } catch (error) {
+      console.error("Error en el chat:", error);
+    } finally {
       setIsTyping(false)
-    }, 1500)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-muted-foreground animate-pulse">Iniciando espacio seguro...</p>
+        </div>
+      </div>
+    );
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
