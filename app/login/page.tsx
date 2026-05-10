@@ -11,6 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sparkles, ArrowRight, Mail, Lock } from "lucide-react";
 
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,8 +27,23 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push("/chat");
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Obtener el rol del usuario desde Firestore
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        if (userData.role === "psicologo") {
+          router.push("/dashboard/alerts");
+        } else {
+          router.push("/dashboard");
+        }
+      } else {
+        // Por defecto si no hay documento (usuario nuevo o error)
+        router.push("/dashboard");
+      }
     } catch (err: any) {
       setError("Credenciales incorrectas. Inténtalo de nuevo.");
     } finally {

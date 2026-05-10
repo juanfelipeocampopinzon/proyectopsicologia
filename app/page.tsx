@@ -1,291 +1,204 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { FloatingNav } from "@/components/floating-nav"
-import {
-  MessageCircle,
-  Users,
-  BookOpen,
-  Sparkles,
-  ArrowRight,
-  Play,
-  Heart,
-  Shield,
-  Clock,
-  Star,
-} from "lucide-react"
-import { motion } from "framer-motion"
-import Image from "next/image"
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { Sparkles, MessageCircle, Shield, Brain, ArrowRight, UserCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-export default function HomePage() {
+import { useState, useEffect } from "react";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+
+export default function LandingPage() {
+  const [user, setUser] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        if (userDoc.exists()) {
+          setUserRole(userDoc.data().role);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const getDashboardLink = () => {
+    return userRole === "psicologo" ? "/dashboard/alerts" : "/dashboard";
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      window.location.reload(); // Recargar para limpiar estado
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-background">
-      <FloatingNav />
+    <div className="min-h-screen bg-[#fcfdfd] text-slate-900 selection:bg-primary/20">
+      {/* NAVBAR */}
+      <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <span className="text-2xl font-serif font-bold tracking-tight">LUMEN</span>
+          </div>
+          
+          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
+            <Link href="/resources" className="hover:text-primary transition-colors">Recursos</Link>
+            <Link href="/emergency" className="hover:text-primary transition-colors text-destructive/80">Emergencia</Link>
+            {userRole === "psicologo" && (
+              <Link href="/dashboard/alerts" className="hover:text-primary transition-colors font-bold text-primary">Panel de Control</Link>
+            )}
+          </div>
 
-      {/* Bento Grid Hero */}
-      <main className="container mx-auto px-4 py-8 md:py-12">
-        <div className="grid grid-cols-12 gap-4 md:gap-6 auto-rows-[minmax(120px,auto)]">
-          {/* Main Hero Card - Large */}
+          <div className="flex items-center gap-4">
+            {user ? (
+              <div className="flex items-center gap-2">
+                <Link href={getDashboardLink()}>
+                  <Button variant="ghost" className="rounded-full px-6 flex items-center gap-2 text-slate-600">
+                    <UserCircle className="h-5 w-5" />
+                    Mi Panel
+                  </Button>
+                </Link>
+                <Button 
+                  onClick={handleLogout}
+                  variant="outline" 
+                  className="rounded-full px-4 border-slate-200 text-slate-500 hover:text-destructive hover:border-destructive/20 transition-colors"
+                >
+                  Salir
+                </Button>
+              </div>
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button variant="ghost" className="rounded-full px-6">Iniciar Sesión</Button>
+                </Link>
+                <Link href="/register">
+                  <Button className="rounded-full px-6 shadow-lg shadow-primary/20">Registrarse</Button>
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      {/* HERO SECTION */}
+      <section className="relative pt-44 pb-32 overflow-hidden">
+        {/* Decoración de fondo */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full -z-10">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[60%] bg-primary/5 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[60%] bg-blue-500/5 rounded-full blur-3xl" />
+        </div>
+
+        <div className="max-w-7xl mx-auto px-6 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="col-span-12 lg:col-span-8 row-span-2 relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/10 via-accent/5 to-secondary/10 p-8 md:p-12 flex flex-col justify-between min-h-[400px]"
+            transition={{ duration: 0.6 }}
           >
-            <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-secondary/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+            <span className="inline-block px-4 py-1.5 mb-6 text-sm font-bold tracking-wider text-primary uppercase bg-primary/10 rounded-full">
+              Salud Mental Inteligente
+            </span>
+            <h1 className="text-6xl md:text-8xl font-serif font-bold leading-tight mb-8 tracking-tighter">
+              Tu luz en el camino <br /> 
+              <span className="text-slate-400 italic">hacia el bienestar.</span>
+            </h1>
+            <p className="max-w-2xl mx-auto text-xl text-slate-500 leading-relaxed mb-12">
+              LUMEN combina la inteligencia artificial más avanzada con la ética clínica para ofrecerte un espacio seguro, privado y disponible 24/7.
+            </p>
 
-            <div className="relative z-10 space-y-6 max-w-2xl">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
-                <Sparkles className="h-4 w-4" />
-                Tu espacio seguro
-              </div>
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-semibold leading-tight text-balance">
-                Encuentra calma en cada momento
-              </h1>
-              <p className="text-lg md:text-xl text-muted-foreground leading-relaxed max-w-xl text-pretty">
-                LUMEN te acompana con apoyo emocional inmediato, profesionales certificados y recursos para tu
-                bienestar.
-              </p>
-            </div>
-
-            <div className="relative z-10 flex flex-wrap gap-4 mt-8">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
               <Link href="/chat">
-                <Button size="lg" className="rounded-2xl text-base px-8 h-14 shadow-lg shadow-primary/20">
-                  <MessageCircle className="mr-2 h-5 w-5" />
-                  Comenzar a hablar
+                <Button size="lg" className="h-16 px-10 rounded-2xl text-lg shadow-xl shadow-primary/30 transition-all hover:scale-105 active:scale-95">
+                  {user ? "Hablar con la IA" : "Probar Chat Gratis"}
+                  <MessageCircle className="ml-3 h-5 w-5" />
                 </Button>
               </Link>
-              <Button
-                size="lg"
-                variant="outline"
-                className="rounded-2xl text-base px-8 h-14 bg-background/50 backdrop-blur"
-              >
-                <Play className="mr-2 h-5 w-5" />
-                Ver como funciona
-              </Button>
-            </div>
-          </motion.div>
-
-          {/* Quick Action Card - Chat */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="col-span-12 sm:col-span-6 lg:col-span-4 row-span-1 group"
-          >
-            <Link href="/chat" className="block h-full">
-              <div className="h-full rounded-3xl bg-primary p-6 md:p-8 text-primary-foreground flex flex-col justify-between transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-primary/20 cursor-pointer">
-                <div className="w-12 h-12 rounded-2xl bg-primary-foreground/20 flex items-center justify-center mb-4">
-                  <MessageCircle className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold mb-2">Chat emocional</h3>
-                  <p className="text-primary-foreground/80 text-sm">Habla con LUMEN 24/7</p>
-                </div>
-                <ArrowRight className="h-5 w-5 mt-4 group-hover:translate-x-2 transition-transform" />
-              </div>
-            </Link>
-          </motion.div>
-
-          {/* Stats Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="col-span-12 sm:col-span-6 lg:col-span-4 row-span-1"
-          >
-            <div className="h-full rounded-3xl bg-card border-2 border-border p-6 md:p-8 flex flex-col justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex -space-x-3">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div
-                      key={i}
-                      className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-secondary/30 border-2 border-background flex items-center justify-center text-xs font-medium"
-                    >
-                      {/* TODO: Agregar avatares aqui /images/avatars/user-{i}.jpg */}
-                    </div>
-                  ))}
-                </div>
-                <div className="text-sm text-muted-foreground">+12,000 personas apoyadas</div>
-              </div>
-              <div className="mt-4">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-serif font-bold">98%</span>
-                  <span className="text-muted-foreground text-sm">satisfaccion</span>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Professional Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="col-span-12 sm:col-span-6 lg:col-span-4 row-span-2 group"
-          >
-            <Link href="/professionals" className="block h-full">
-              <div className="h-full rounded-3xl bg-secondary/20 p-6 md:p-8 flex flex-col transition-all hover:bg-secondary/30 cursor-pointer">
-                <div className="flex-1 flex flex-col">
-                  <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center mb-4">
-                    <Users className="h-6 w-6 text-secondary-foreground" />
-                  </div>
-                  <h3 className="text-2xl font-serif font-semibold mb-3 text-balance">
-                    Profesionales certificados
-                  </h3>
-                  <p className="text-muted-foreground text-sm leading-relaxed">
-                    Conecta con psicologos y terapeutas especializados que entienden lo que estas pasando.
-                  </p>
-                </div>
-
-                <div className="mt-6 pt-6 border-t border-secondary/30">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Star className="h-4 w-4 fill-accent text-accent" />
-                      <span className="text-sm font-medium">4.9 promedio</span>
-                    </div>
-                    <ArrowRight className="h-5 w-5 group-hover:translate-x-2 transition-transform" />
-                  </div>
-                </div>
-              </div>
-            </Link>
-          </motion.div>
-
-          {/* Features Grid */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-            className="col-span-12 sm:col-span-6 lg:col-span-4 row-span-1"
-          >
-            <div className="h-full rounded-3xl bg-accent/20 p-6 md:p-8 flex items-center gap-6">
-              <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center flex-shrink-0">
-                <Shield className="h-8 w-8 text-accent-foreground" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg mb-1">100% Confidencial</h3>
-                <p className="text-sm text-muted-foreground">Tus conversaciones estan protegidas</p>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.5 }}
-            className="col-span-12 sm:col-span-6 lg:col-span-4 row-span-1"
-          >
-            <div className="h-full rounded-3xl bg-card border-2 border-border p-6 md:p-8 flex items-center gap-6">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <Clock className="h-8 w-8 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg mb-1">Disponible 24/7</h3>
-                <p className="text-sm text-muted-foreground">Cuando lo necesites</p>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Resources Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.6 }}
-            className="col-span-12 lg:col-span-8 row-span-1 group"
-          >
-            <Link href="/resources" className="block h-full">
-              <div className="h-full rounded-3xl bg-gradient-to-r from-card via-card to-secondary/10 border-2 border-border p-6 md:p-8 flex items-center justify-between transition-all hover:border-secondary/50 cursor-pointer">
-                <div className="flex items-center gap-6">
-                  <div className="w-16 h-16 rounded-2xl bg-secondary/20 flex items-center justify-center flex-shrink-0">
-                    <BookOpen className="h-8 w-8 text-secondary" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold mb-1">Recursos para tu bienestar</h3>
-                    <p className="text-muted-foreground text-sm">
-                      Articulos, meditaciones, ejercicios de respiracion y mas
-                    </p>
-                  </div>
-                </div>
-                <ArrowRight className="h-6 w-6 text-muted-foreground group-hover:translate-x-2 group-hover:text-foreground transition-all" />
-              </div>
-            </Link>
-          </motion.div>
-
-          {/* Testimonial Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.7 }}
-            className="col-span-12 lg:col-span-6 row-span-1"
-          >
-            <div className="h-full rounded-3xl bg-card border-2 border-border p-6 md:p-8">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center flex-shrink-0">
-                  {/* TODO: Agregar foto /images/testimonials/user-1.jpg */}
-                  <span className="text-lg font-medium">M</span>
-                </div>
-                <div>
-                  <p className="text-foreground leading-relaxed italic mb-3 text-pretty">
-                    "LUMEN me ayudo a encontrar paz en momentos muy dificiles. Es como tener un amigo que siempre
-                    esta ahi."
-                  </p>
-                  <p className="text-sm text-muted-foreground">Maria G. - Usuario desde 2025</p>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* CTA Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.8 }}
-            className="col-span-12 lg:col-span-6 row-span-1"
-          >
-            <div className="h-full rounded-3xl bg-gradient-to-br from-primary to-primary/80 p-6 md:p-8 text-primary-foreground flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-primary-foreground/20 flex items-center justify-center">
-                  <Heart className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg">Comienza hoy</h3>
-                  <p className="text-sm text-primary-foreground/80">Tu bienestar es nuestra prioridad</p>
-                </div>
-              </div>
-              <Link href="/chat">
-                <Button variant="secondary" className="rounded-2xl">
-                  Empezar
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
+              {user ? (
+                <Link href={getDashboardLink()}>
+                  <Button size="lg" variant="outline" className="h-16 px-10 rounded-2xl text-lg border-2 hover:bg-slate-50 transition-all">
+                    {userRole === "psicologo" ? "Ir a Monitoreo" : "Mi Espacio Personal"}
+                    <ArrowRight className="ml-3 h-5 w-5" />
+                  </Button>
+                </Link>
+              ) : (
+                <Link href="/register">
+                  <Button size="lg" variant="outline" className="h-16 px-10 rounded-2xl text-lg border-2 hover:bg-slate-50 transition-all">
+                    Comenzar ahora
+                    <ArrowRight className="ml-3 h-5 w-5" />
+                  </Button>
+                </Link>
+              )}
             </div>
           </motion.div>
         </div>
+      </section>
 
-        {/* Footer */}
-        <footer className="mt-16 pt-8 border-t border-border">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              <span className="font-semibold text-foreground">LUMEN</span>
-              <span>© 2026</span>
-            </div>
-            <div className="flex items-center gap-6">
-              <Link href="/privacy" className="hover:text-foreground transition-colors">
-                Privacidad
-              </Link>
-              <Link href="/terms" className="hover:text-foreground transition-colors">
-                Terminos
-              </Link>
-              <Link href="/emergency" className="text-destructive hover:text-destructive/80 transition-colors">
-                Emergencia
-              </Link>
-            </div>
+      {/* FEATURES */}
+      <section className="py-24 bg-white border-y border-slate-100">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid md:grid-cols-3 gap-12">
+            {[
+              {
+                icon: <Brain className="h-8 w-8" />,
+                title: "IA Empática",
+                desc: "Basada en Terapia Cognitivo-Conductual para ofrecerte reflexiones valiosas en cualquier momento."
+              },
+              {
+                icon: <Shield className="h-8 w-8" />,
+                title: "Privacidad Total",
+                desc: "Tus conversaciones son privadas y están protegidas con los más altos estándares de seguridad."
+              },
+              {
+                icon: <UserCircle className="h-8 w-8" />,
+                title: "Red de Apoyo",
+                desc: "En caso de crisis, nuestro sistema alerta automáticamente a profesionales calificados."
+              }
+            ].map((feature, i) => (
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.2 }}
+                className="p-8 rounded-3xl bg-slate-50/50 border border-slate-100 hover:border-primary/20 transition-all hover:shadow-xl hover:shadow-slate-200/50 group"
+              >
+                <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center text-primary shadow-sm mb-6 group-hover:scale-110 transition-transform">
+                  {feature.icon}
+                </div>
+                <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
+                <p className="text-slate-500 leading-relaxed">{feature.desc}</p>
+              </motion.div>
+            ))}
           </div>
-        </footer>
-      </main>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="py-12 bg-slate-50/50">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-2 opacity-50">
+            <Sparkles className="h-5 w-5" />
+            <span className="font-serif font-bold">LUMEN</span>
+          </div>
+          <p className="text-sm text-slate-400">
+            © 2024 LUMEN Health. Todos los derechos reservados.
+          </p>
+          <div className="flex gap-8 text-sm text-slate-400">
+            <Link href="#" className="hover:text-primary">Privacidad</Link>
+            <Link href="#" className="hover:text-primary">Términos</Link>
+          </div>
+        </div>
+      </footer>
     </div>
-  )
+  );
 }
