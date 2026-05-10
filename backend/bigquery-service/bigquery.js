@@ -60,4 +60,22 @@ async function setupBigQuery() {
   }
 }
 
-module.exports = { insertChatLog, setupBigQuery };
+/**
+ * Ejecuta una consulta SQL en BigQuery
+ * @param {string} query - Consulta SQL
+ */
+async function executeQuery(query) {
+  try {
+    const options = {
+      query: query,
+      location: 'US', // O la ubicación de tu dataset
+    };
+    const [rows] = await bigquery.query(options);
+    return rows;
+  } catch (error) {
+    console.error('❌ Error ejecutando consulta en BigQuery:', error);
+    throw error;
+  }
+}
+
+module.exports = { insertChatLog, setupBigQuery, executeQuery };

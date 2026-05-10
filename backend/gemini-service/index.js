@@ -14,8 +14,13 @@ const project = process.env.PROJECT_ID || 'microservicio-471115';
 // Gemini 2.5 Pro se debe acceder usando la región "global"
 const location = 'global';
 
-// Instanciamos usando el modo vertexai con la nueva SDK
-const ai = new GoogleGenAI({ vertexai: true, project: project, location: location });
+// Instanciamos usando el modo vertexai con la nueva SDK y pasamos la ruta de las credenciales
+const ai = new GoogleGenAI({ 
+  vertexai: true, 
+  project: project, 
+  location: location,
+  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS // Usar la ruta del .env
+});
 const modelName = 'gemini-2.5-pro';
 
 const systemInstruction = "Eres un psicólogo profesional, empático y experto. Debes escuchar al usuario, validar sus emociones, ser ético y ofrecer reflexiones constructivas desde la terapia cognitivo-conductual. Nunca diagnostiques graves trastornos mentales por chat, recomienda un profesional en persona si es necesario. Tu tono es comprensivo y calmado.";
