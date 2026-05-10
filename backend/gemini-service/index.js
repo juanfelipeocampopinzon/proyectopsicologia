@@ -23,7 +23,17 @@ const ai = new GoogleGenAI({
 });
 const modelName = 'gemini-2.5-pro';
 
-const systemInstruction = "Eres un psicólogo profesional, empático y experto. Debes escuchar al usuario, validar sus emociones, ser ético y ofrecer reflexiones constructivas desde la terapia cognitivo-conductual. Nunca diagnostiques graves trastornos mentales por chat, recomienda un profesional en persona si es necesario. Tu tono es comprensivo y calmado.";
+const systemInstruction = `Eres un psicólogo profesional, empático y experto. 
+Tu tarea es doble: 
+1. Responder al usuario de forma empática.
+2. Evaluar el riesgo de seguridad (ideación suicida, autolesiones, violencia).
+
+DEBES RESPONDER ÚNICAMENTE EN FORMATO JSON con la siguiente estructura:
+{
+  "response": "tu respuesta empática aquí",
+  "risk_level": "BAJO" | "MEDIO" | "ALTO",
+  "risk_analysis": "breve razón de la evaluación de riesgo"
+}`;
 
 app.post('/api/chat', async (req, res) => {
   try {
@@ -33,30 +43,56 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'La solicitud debe contener un arreglo de mensajes' });
     }
 
-    // Adaptamos el formato de Next.js al formato que requiere Google Gen AI
     const formattedContents = messages.map(msg => ({
       role: msg.role === 'model' ? 'model' : 'user',
-      parts: msg.parts // Asume un arreglo con [{ text: "..." }]
+      parts: msg.parts
     }));
 
-    const response = await ai.models.generateContent({
+    const result = await ai.models.generateContent({
       model: modelName,
       contents: formattedContents,
       config: {
         systemInstruction: systemInstruction,
+        responseMimeType: "application/json",
+        safetySettings: [
+          { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
+        ]
       }
     });
 
-    const botResponse = response.text;
+    // Extracción ultra-segura del texto
+    let textResponse = "";
+    try {
+      // Intentamos todas las rutas posibles del objeto de respuesta
+      textResponse = result.response?.text?.() || 
+                     result.text || 
+                     result.candidates?.[0]?.content?.parts?.[0]?.text || 
+                     "";
+    } catch (e) {
+      console.log("Error al extraer texto directamente, revisando objeto...");
+    }
+
+    if (!textResponse) {
+      console.error("Respuesta vacía o bloqueada por seguridad. Objeto recibido:", JSON.stringify(result, null, 2));
+      return res.status(500).json({ error: "La IA bloqueó el mensaje por seguridad o devolvió un formato vacío." });
+    }
+
+    textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+    const aiData = JSON.parse(textResponse);
 
     return res.json({
       success: true,
-      response: botResponse
+      response: aiData.response,
+      risk_level: aiData.risk_level,
+      risk_analysis: aiData.risk_analysis
     });
 
   } catch (error) {
     console.error("Error al comunicarse con Vertex AI:", error);
-    return res.status(500).json({ error: 'Error interno del servidor en el bot de psicología', details: error.message });
+    return res.status(500).json({ error: 'Error en el bot de psicología', details: error.message });
   }
 });
 
