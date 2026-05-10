@@ -2,10 +2,13 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Sparkles, MessageCircle, Users, BookOpen, LayoutDashboard, Moon, Sun, AlertCircle } from "lucide-react"
+import { Sparkles, MessageCircle, Users, BookOpen, LayoutDashboard, Moon, Sun, AlertCircle, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
+import { auth } from "@/lib/firebase"
+import { signOut } from "firebase/auth"
+import { useRouter } from "next/navigation"
 
 const navItems = [
   { href: "/", icon: Sparkles, label: "Inicio" },
@@ -17,8 +20,18 @@ const navItems = [
 
 export function FloatingNav() {
   const pathname = usePathname()
+  const router = useRouter()
   const [isDark, setIsDark] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth)
+      router.push("/")
+    } catch (error) {
+      console.error("Error signing out:", error)
+    }
+  }
 
   useEffect(() => {
     const darkMode = localStorage.getItem("darkMode") === "true"
@@ -79,6 +92,10 @@ export function FloatingNav() {
           {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
 
+        <Button variant="ghost" size="icon" onClick={handleLogout} className="rounded-xl text-slate-500">
+          <LogOut className="h-4 w-4" />
+        </Button>
+
         <Link href="/emergency">
           <Button variant="ghost" size="icon" className="rounded-xl text-destructive hover:text-destructive">
             <AlertCircle className="h-4 w-4" />
@@ -103,8 +120,8 @@ export function FloatingNav() {
               </Link>
             )
           })}
-          <Button variant="ghost" size="icon" onClick={toggleDarkMode} className="rounded-xl h-12 w-12">
-            {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          <Button variant="ghost" size="icon" onClick={handleLogout} className="rounded-xl h-12 w-12">
+            <LogOut className="h-5 w-5" />
           </Button>
         </div>
       </nav>

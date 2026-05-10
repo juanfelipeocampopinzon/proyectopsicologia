@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { db, auth } from "@/lib/firebase";
-import { collection, query, orderBy, onSnapshot, updateDoc, doc } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, updateDoc, doc, getDoc, addDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 import { 
   AlertTriangle, 
   CheckCircle, 
@@ -17,10 +18,13 @@ import {
   ShieldAlert,
   Search,
   X,
-  MessageSquare
+  MessageSquare,
+  Plus,
+  ArrowRight
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface Alert {
   id: string;
@@ -46,13 +50,40 @@ export default function AlertsDashboard() {
   const [selectedUserHistory, setSelectedUserHistory] = useState<Message[] | null>(null);
   const [selectedUserName, setSelectedUserName] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [lastAlertId, setLastAlertId] = useState<string | null>(null);
+  const [profMessage, setProfMessage] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [isIntervening, setIsIntervening] = useState(false);
   const router = useRouter();
 
-  // Protección de ruta (Solo para psicólogos - Por ahora solo verificamos auth)
+  const markAsResolved = async (alertId: string) => {
+    try {
+      const alertRef = doc(db, "emergency_alerts", alertId);
+      await updateDoc(alertRef, { status: "ATENDIDA" });
+    } catch (error) {
+      console.error("Error al actualizar alerta:", error);
+    }
+  };
+
+  // Función para reproducir sonido de alerta
+  const playAlertSound = () => {
+    const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+    audio.volume = 0.5;
+    audio.play().catch(e => console.log("Audio play blocked by browser"));
+  };
+
+  // Protección de ruta (Solo para psicólogos)
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        setUser(currentUser);
+        // Verificar Rol en Firestore
+        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        if (userDoc.exists() && userDoc.data().role === "psicologo") {
+          setUser(currentUser);
+        } else {
+          // Si no es psicólogo, redirigir al chat
+          router.push("/chat");
+        }
       } else {
         router.push("/login");
       }
@@ -60,7 +91,7 @@ export default function AlertsDashboard() {
     return () => unsubscribe();
   }, [router]);
 
-  // Cargar alertas en tiempo real
+  // Cargar alertas en tiempo real con sonido
   useEffect(() => {
     if (!user) return;
 
@@ -74,16 +105,32 @@ export default function AlertsDashboard() {
         id: doc.id,
         ...doc.data()
       })) as Alert[];
+
+      // Si hay una alerta nueva PENDIENTE, sonar alarma
+      if (loadedAlerts.length > 0) {
+        const newestAlert = loadedAlerts[0];
+        if (newestAlert.status === "PENDIENTE" && lastAlertId && newestAlert.id !== lastAlertId) {
+          playAlertSound();
+        }
+        setLastAlertId(newestAlert.id);
+      }
+
       setAlerts(loadedAlerts);
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, lastAlertId]);
 
-  const viewHistory = (userId: string, userName: string) => {
+  const viewHistory = async (userId: string, userName: string) => {
     setSelectedUserName(userName);
+    setSelectedUserId(userId);
     setIsModalOpen(true);
+    setSelectedUserHistory(null);
+    
+    // Verificar si ya está bajo intervención
+    const userSnap = await getDoc(doc(db, "users", userId));
+    setIsIntervening(userSnap.data()?.isUnderCare || false);
     
     const q = query(
       collection(db, "users", userId, "chat_history"),
@@ -107,14 +154,37 @@ export default function AlertsDashboard() {
     }
   };
 
-  const markAsResolved = async (alertId: string) => {
+  const toggleIntervention = async (userId: string, currentStatus: boolean) => {
     try {
-      const alertRef = doc(db, "emergency_alerts", alertId);
-      await updateDoc(alertRef, { status: "ATENDIDA" });
+      const userRef = doc(db, "users", userId);
+      // Usamos setDoc con merge:true para que cree el documento si no existe
+      await setDoc(userRef, { isUnderCare: !currentStatus }, { merge: true });
+      setIsIntervening(!currentStatus);
     } catch (error) {
-      console.error("Error al actualizar alerta:", error);
+      console.error("Error al cambiar modo de intervención:", error);
     }
   };
+
+  const sendMessageAsProfessional = async (userId: string, text: string) => {
+    if (!text.trim()) return;
+    try {
+      await addDoc(collection(db, "users", userId, "chat_history"), {
+        role: "assistant",
+        content: `[PROFESIONAL] ${text}`,
+        timestamp: serverTimestamp()
+      });
+    } catch (error) {
+      console.error("Error al enviar mensaje profesional:", error);
+    }
+  };
+
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredAlerts = alerts.filter(alert => 
+    alert.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    alert.userEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    alert.message.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -127,46 +197,90 @@ export default function AlertsDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-12 relative">
-      {/* ... (Header) */}
       <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
+        {/* HEADER MEJORADO */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
           <div>
-            <div className="flex items-center gap-2 text-destructive mb-2 font-bold tracking-wider text-sm uppercase">
-              <ShieldAlert className="h-4 w-4" />
+            <div className="flex items-center gap-2 text-primary mb-2 font-bold tracking-wider text-sm uppercase">
+              <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
               Centro de Monitoreo Crítico
             </div>
-            <h1 className="text-4xl font-serif font-bold text-slate-900">Alertas de Riesgo</h1>
+            <h1 className="text-4xl md:text-5xl font-serif font-bold text-slate-900 tracking-tight">
+              Alertas de Riesgo
+            </h1>
           </div>
-          
-          <div className="flex items-center gap-4">
-            <div className="bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
-              <div className="text-right">
-                <p className="text-xs text-slate-500">Alertas Pendientes</p>
-                <p className="text-xl font-bold text-destructive">
-                  {alerts.filter(a => a.status === "PENDIENTE").length}
-                </p>
-              </div>
-              <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center text-destructive">
-                <AlertTriangle className="h-5 w-5" />
-              </div>
-            </div>
+          <div className="flex gap-4">
+            <Link href="/dashboard/alerts/new-resource">
+              <Button className="h-16 px-8 rounded-2xl bg-primary shadow-xl shadow-primary/30 flex items-center gap-3 transition-all hover:scale-105 active:scale-95 text-lg">
+                <Plus className="h-6 w-6" />
+                Publicar Artículo
+              </Button>
+            </Link>
           </div>
         </div>
 
-        <div className="grid gap-6">
+        {/* MÉTRICAS PRO (KPIs) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          {[
+            { label: "Alertas Pendientes", value: alerts.filter(a => a.status === "PENDIENTE").length, icon: AlertTriangle, color: "text-destructive", bg: "bg-destructive/5" },
+            { label: "Casos Atendidos", value: alerts.filter(a => a.status === "ATENDIDA").length, icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50" },
+            { label: "Usuarios en Riesgo", value: new Set(alerts.map(a => a.userId)).size, icon: User, color: "text-blue-600", bg: "bg-blue-50" },
+            { label: "Tiempo de Respuesta", value: "4.2 min", icon: Clock, color: "text-amber-600", bg: "bg-amber-50" },
+          ].map((stat, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center justify-between group hover:shadow-md transition-all"
+            >
+              <div>
+                <p className="text-sm font-medium text-slate-500 mb-1">{stat.label}</p>
+                <p className={cn("text-3xl font-bold font-serif", stat.color)}>{stat.value}</p>
+              </div>
+              <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110", stat.bg)}>
+                <stat.icon className={cn("h-7 w-7", stat.color)} />
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* BUSCADOR Y FILTROS */}
+        <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm mb-10 flex flex-col md:flex-row gap-4 items-center">
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Buscar por paciente o correo..." 
+              value={searchQuery || ""}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-12 pl-12 pr-4 rounded-2xl bg-slate-50 border-transparent focus:bg-white focus:border-primary/20 outline-none transition-all"
+            />
+          </div>
+          <div className="flex gap-2 w-full md:w-auto">
+            <Button variant="outline" className="flex-1 md:flex-none h-12 rounded-2xl border-slate-200">Hoy</Button>
+            <Button variant="outline" className="flex-1 md:flex-none h-12 rounded-2xl border-slate-200">Críticos</Button>
+          </div>
+        </div>
+
+        <div className="grid gap-6 pb-20">
           <AnimatePresence>
-            {alerts.length === 0 ? (
+            {filteredAlerts.length === 0 ? (
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="bg-white rounded-3xl p-12 text-center border-2 border-dashed border-slate-200"
               >
                 <CheckCircle className="h-12 w-12 text-emerald-500 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold text-slate-900">Todo está bajo control</h2>
-                <p className="text-slate-500 mt-2">No se han detectado alertas de riesgo en este momento.</p>
+                <h2 className="text-xl font-semibold text-slate-900">
+                  {searchQuery ? "No hay resultados para tu búsqueda" : "Todo está bajo control"}
+                </h2>
+                <p className="text-slate-500 mt-2">
+                  {searchQuery ? "Intenta con otro nombre o correo." : "No se han detectado alertas de riesgo en este momento."}
+                </p>
               </motion.div>
             ) : (
-              alerts.map((alert) => (
+              filteredAlerts.map((alert) => (
                 <motion.div
                   key={alert.id}
                   layout
@@ -293,11 +407,27 @@ export default function AlertsDashboard() {
                   <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                     <MessageSquare className="h-5 w-5" />
                   </div>
-                  <h2 className="font-bold text-xl">Conversación de {selectedUserName}</h2>
+                  <div className="flex flex-col">
+                    <h2 className="font-bold text-xl leading-tight">Conversación de {selectedUserName}</h2>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1">
+                      <div className={`w-1.5 h-1.5 rounded-full ${isIntervening ? 'bg-primary animate-pulse' : 'bg-slate-300'}`} />
+                      {isIntervening ? 'Intervención Activa' : 'Modo IA'}
+                    </span>
+                  </div>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)} className="rounded-full">
-                  <X className="h-5 w-5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant={isIntervening ? "destructive" : "outline"}
+                    size="sm"
+                    className="rounded-xl h-10 px-4"
+                    onClick={() => selectedUserId && toggleIntervention(selectedUserId, isIntervening)}
+                  >
+                    {isIntervening ? "Cerrar Intervención" : "Intervenir Chat"}
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)} className="rounded-full h-10 w-10">
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50">
@@ -312,7 +442,9 @@ export default function AlertsDashboard() {
                       <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${
                         msg.role === 'user' 
                           ? 'bg-primary text-primary-foreground rounded-tr-none' 
-                          : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none shadow-sm'
+                          : msg.content.includes('[PROFESIONAL]')
+                            ? 'bg-primary/10 border-2 border-primary/20 text-primary font-medium rounded-tl-none'
+                            : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none shadow-sm'
                       }`}>
                         <p>{msg.content}</p>
                         <p className={`text-[10px] mt-1 opacity-60 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
@@ -324,9 +456,30 @@ export default function AlertsDashboard() {
                 )}
               </div>
 
-              <div className="p-4 bg-white border-t border-slate-100 text-center">
-                <p className="text-xs text-slate-400 uppercase font-bold tracking-widest">Fin del historial actual</p>
-              </div>
+              {isIntervening && (
+                <div className="p-4 bg-white border-t border-slate-100 flex gap-2 animate-in slide-in-from-bottom-2 duration-300">
+                  <input 
+                    type="text"
+                    value={profMessage}
+                    onChange={(e) => setProfMessage(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && selectedUserId && (sendMessageAsProfessional(selectedUserId, profMessage), setProfMessage(""))}
+                    placeholder="Escribe tu respuesta profesional..."
+                    className="flex-1 h-12 bg-slate-50 border-transparent rounded-xl px-4 text-sm focus:bg-white focus:border-primary/20 outline-none transition-all"
+                  />
+                  <Button 
+                    onClick={() => selectedUserId && (sendMessageAsProfessional(selectedUserId, profMessage), setProfMessage(""))}
+                    className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center p-0"
+                  >
+                    <ArrowRight className="h-5 w-5" />
+                  </Button>
+                </div>
+              )}
+
+              {!isIntervening && (
+                <div className="p-4 bg-white border-t border-slate-100 text-center">
+                  <p className="text-xs text-slate-400 uppercase font-bold tracking-widest">Fin del historial actual</p>
+                </div>
+              )}
             </motion.div>
           </div>
         )}

@@ -5,12 +5,12 @@ import React from "react"
 import { useState, useRef, useEffect } from "react"
 import { FloatingNav } from "@/components/floating-nav"
 import { Button } from "@/components/ui/button"
-import { Send, Sparkles, Phone, Mic, Smile } from "lucide-react"
+import { Send, Sparkles, Phone, Mic, Smile, ShieldAlert, UserCircle } from "lucide-react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { db, auth } from "@/lib/firebase"
-import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, Timestamp } from "firebase/firestore"
+import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, Timestamp, doc } from "firebase/firestore"
 import { onAuthStateChanged } from "firebase/auth"
 import { useRouter } from "next/navigation"
 
@@ -18,7 +18,7 @@ interface Message {
   id: string
   role: "user" | "assistant"
   content: string
-  timestamp: Date | Timestamp
+  timestamp: Date
 }
 
 const quickReplies = [
@@ -32,6 +32,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isTyping, setIsTyping] = useState(false)
+  const [isUnderCare, setIsUnderCare] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -42,19 +43,28 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
-  // Verificar autenticación
+  // Verificar autenticación y estado de cuidado
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
         setLoading(false);
+        // Escuchar cambios en el estado de intervención del usuario
+        const userDocRef = doc(db, "users", currentUser.uid);
+        const unsubDoc = onSnapshot(userDocRef, (doc) => {
+          if (doc.exists()) {
+            setIsUnderCare(doc.data().isUnderCare || false);
+          }
+        });
+        return () => unsubDoc();
       } else {
-        router.push("/login");
+        setLoading(false);
+        // Ya no redirigimos al login, permitimos modo invitado
       }
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, []);
 
   // Cargar mensajes desde Firestore filtrados por usuario
   useEffect(() => {
@@ -67,7 +77,7 @@ export default function ChatPage() {
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const loadedMessages = snapshot.docs.map(doc => {
-        const data = doc.data();
+        const data = doc.data({ serverTimestamps: 'estimate' });
         return {
           id: doc.id,
           role: data.role,
@@ -80,7 +90,7 @@ export default function ChatPage() {
         setMessages([{
           id: "welcome",
           role: "assistant",
-          content: `Hola ${user.displayName || ""}, soy LUMEN. Estoy aqui para escucharte sin juzgar. ¿Como te sientes hoy?`,
+          content: `Hola ${user.displayName || "amigo"}, soy LUMEN. Estoy aqui para escucharte sin juzgar. ¿Como te sientes hoy?`,
           timestamp: new Date()
         }]);
       } else {
@@ -90,6 +100,18 @@ export default function ChatPage() {
 
     return () => unsubscribe();
   }, [user])
+
+  // Inicialización para invitados
+  useEffect(() => {
+    if (!user && !loading) {
+      setMessages([{
+        id: "guest-welcome",
+        role: "assistant",
+        content: "Hola, soy LUMEN. Como invitado, nuestra conversación es privada y no se guardará. Si deseas mantener un historial, por favor inicia sesión.",
+        timestamp: new Date()
+      }]);
+    }
+  }, [user, loading]);
 
   useEffect(() => {
     scrollToBottom()
@@ -109,27 +131,38 @@ export default function ChatPage() {
       setInput("")
       setIsTyping(true)
 
-      // 1. Guardar en Firestore privado
-      await addDoc(collection(db, "users", user.uid, "chat_history"), userMessageData);
+      // Actualizar UI local inmediatamente para feedback rápido
+      const newUserMsg: Message = { id: Date.now().toString(), role: "user", content: messageText, timestamp: new Date() };
+      if (!user) setMessages(prev => [...prev, newUserMsg]);
 
-      // 2. Registrar en BigQuery
-      fetch('http://localhost:8081/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: user.uid,
-          role: "user",
-          content: messageText,
-          timestamp: new Date().toISOString()
-        })
-      }).catch(err => console.error("Error logging to BigQuery:", err));
+      // 1. Guardar en Firestore privado (SOLO SI HAY USUARIO)
+      if (user) {
+        await addDoc(collection(db, "users", user.uid, "chat_history"), userMessageData);
+        
+        // 2. Registrar en BigQuery
+        fetch('http://localhost:8081/api/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: user.uid,
+            role: "user",
+            content: messageText,
+            timestamp: new Date().toISOString()
+          })
+        }).catch(err => console.error("Error logging to BigQuery:", err));
+      }
 
-      // 3. Obtener respuesta de Gemini Service
+      // 3. Obtener respuesta de Gemini Service (SOLO SI NO HAY INTERVENCION HUMANA)
+      if (isUnderCare) {
+        setIsTyping(false);
+        return; // Salir, el profesional responderá manualmente
+      }
+
       const response = await fetch('http://localhost:8080/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: messages.concat({ id: "temp", role: "user", content: messageText, timestamp: new Date() })
+          messages: messages.concat(newUserMsg)
             .map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }))
         })
       });
@@ -139,41 +172,45 @@ export default function ChatPage() {
       const riskLevel = data.risk_level || "BAJO";
       const riskAnalysis = data.risk_analysis || "";
 
-      // 4. Si el riesgo es ALTO, generar alerta para psicólogos
+      // 4. Si el riesgo es ALTO, generar alerta para psicólogos (INCLUSO PARA INVITADOS)
       if (riskLevel === "ALTO") {
         await addDoc(collection(db, "emergency_alerts"), {
-          userId: user.uid,
-          userName: user.displayName || "Usuario Anónimo",
-          userEmail: user.email,
+          userId: user?.uid || "invitado",
+          userName: user?.displayName || "Usuario Invitado",
+          userEmail: user?.email || "sin-email@lumen.com",
           message: messageText,
           riskAnalysis: riskAnalysis,
           timestamp: serverTimestamp(),
-          status: "PENDIENTE", // Para que el psicólogo la marque como atendida
+          status: "PENDIENTE",
         });
-        console.warn("⚠️ ALERTA DE RIESGO DETECTADA: Enviada a profesionales.");
       }
 
-      // 5. Guardar respuesta del asistente en Firestore privado
-      await addDoc(collection(db, "users", user.uid, "chat_history"), {
-        role: "assistant",
-        content: botResponse,
-        risk_level: riskLevel,
-        timestamp: serverTimestamp(),
-      });
+      // 5. Guardar respuesta del asistente (UI local y Firestore si aplica)
+      const newBotMsg: Message = { id: (Date.now()+1).toString(), role: "assistant", content: botResponse, timestamp: new Date() };
+      if (!user) setMessages(prev => [...prev, newBotMsg]);
 
-      // 6. Registrar respuesta en BigQuery (incluyendo el nivel de riesgo)
-      fetch('http://localhost:8081/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: user.uid,
+      if (user) {
+        await addDoc(collection(db, "users", user.uid, "chat_history"), {
           role: "assistant",
           content: botResponse,
           risk_level: riskLevel,
-          risk_analysis: riskAnalysis,
-          timestamp: new Date().toISOString()
-        })
-      }).catch(err => console.error("Error logging assistant to BigQuery:", err));
+          timestamp: serverTimestamp(),
+        });
+
+        // 6. Registrar respuesta en BigQuery
+        fetch('http://localhost:8081/api/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: user.uid,
+            role: "assistant",
+            content: botResponse,
+            risk_level: riskLevel,
+            risk_analysis: riskAnalysis,
+            timestamp: new Date().toISOString()
+          })
+        }).catch(err => console.error("Error logging assistant to BigQuery:", err));
+      }
 
     } catch (error) {
       console.error("Error en el chat:", error);
@@ -232,6 +269,15 @@ export default function ChatPage() {
           </Link>
         </div>
 
+        {isUnderCare && (
+          <div className="bg-primary/5 border border-primary/10 p-3 mb-6 text-center animate-in slide-in-from-top duration-500 rounded-2xl">
+            <p className="text-xs font-bold text-primary uppercase tracking-widest flex items-center justify-center gap-2">
+              <ShieldAlert className="h-3 w-3" />
+              Un profesional está supervisando esta conversación
+            </p>
+          </div>
+        )}
+
         {/* Messages */}
         <div className="flex-1 overflow-y-auto space-y-6 mb-6">
           <AnimatePresence initial={false}>
@@ -248,22 +294,31 @@ export default function ChatPage() {
                     "max-w-[85%] md:max-w-[70%]",
                     message.role === "user"
                       ? "bg-primary text-primary-foreground rounded-3xl rounded-br-lg"
-                      : "bg-card border-2 border-border rounded-3xl rounded-bl-lg"
+                      : message.content.startsWith("[PROFESIONAL]")
+                        ? "bg-primary/5 border-2 border-primary/20 text-foreground rounded-3xl rounded-bl-lg ring-4 ring-primary/5"
+                        : "bg-card border-2 border-border rounded-3xl rounded-bl-lg"
                   )}
                 >
                   <div className="px-5 py-4">
-                    <p className="text-[15px] leading-relaxed">{message.content}</p>
+                    {message.content.startsWith("[PROFESIONAL]") && (
+                      <div className="flex items-center gap-1.5 mb-2 text-[10px] font-bold text-primary uppercase tracking-widest">
+                        <UserCircle className="h-3.5 w-3.5" />
+                        Psicólogo Profesional
+                      </div>
+                    )}
+                    <p className="text-[15px] leading-relaxed">{message.content.replace("[PROFESIONAL] ", "")}</p>
                   </div>
                   <div
                     className={cn(
                       "px-5 pb-3 text-xs",
                       message.role === "user" ? "text-primary-foreground/60" : "text-muted-foreground"
                     )}
+                    suppressHydrationWarning
                   >
-                    {message.timestamp.toLocaleTimeString("es-ES", {
+                    {message.timestamp instanceof Date ? message.timestamp.toLocaleTimeString("es-ES", {
                       hour: "2-digit",
                       minute: "2-digit",
-                    })}
+                    }) : ""}
                   </div>
                 </div>
               </motion.div>

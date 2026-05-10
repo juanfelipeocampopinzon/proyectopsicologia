@@ -50,7 +50,61 @@ const recommendations = [
   },
 ]
 
+import { useState, useEffect } from "react"
+import { db, auth } from "@/lib/firebase"
+import { onAuthStateChanged } from "firebase/auth"
+import { useRouter } from "next/navigation"
+import { collection, query, orderBy, limit, getDocs, getCountFromServer } from "firebase/firestore"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
+
 export default function DashboardPage() {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ totalConvs: 0, streak: 7 });
+  const [recentHistory, setRecentHistory] = useState<any[]>([]);
+  const router = useRouter();
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+        
+        // 1. Obtener Estadísticas Reales
+        try {
+          const chatColl = collection(db, "users", currentUser.uid, "chat_history");
+          const snapshot = await getCountFromServer(chatColl);
+          setStats(prev => ({ ...prev, totalConvs: snapshot.data().count }));
+
+          // 2. Obtener Historial Reciente
+          const q = query(chatColl, orderBy("timestamp", "desc"), limit(3));
+          const historySnap = await getDocs(q);
+          const history = historySnap.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setRecentHistory(history);
+        } catch (error) {
+          console.error("Error fetching dashboard data:", error);
+        }
+
+        setLoading(false);
+      } else {
+        router.push("/login");
+      }
+    });
+    return () => unsubscribe();
+  }, [router]);
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-slate-500 font-medium animate-pulse">Preparando tu espacio...</p>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <FloatingNav />
@@ -64,18 +118,17 @@ export default function DashboardPage() {
         >
           <div>
             <h1 className="text-3xl md:text-4xl font-serif font-semibold mb-2">
-              Bienvenido de vuelta
+              Bienvenido de vuelta, {user?.displayName?.split(' ')[0] || 'amigo'}
             </h1>
             <p className="text-muted-foreground">Asi va tu camino de bienestar</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="rounded-xl">
-              <Bell className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="icon" className="rounded-xl">
-              <Settings className="h-5 w-5" />
-            </Button>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/30 to-secondary/30 flex items-center justify-center">
+            <Link href="/emergency">
+              <Button variant="ghost" size="icon" className="rounded-xl text-destructive hover:bg-destructive/10">
+                <Heart className="h-5 w-5" />
+              </Button>
+            </Link>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/30 to-secondary/30 flex items-center justify-center border border-primary/10">
               <User className="h-5 w-5" />
             </div>
           </div>
@@ -103,7 +156,7 @@ export default function DashboardPage() {
                 </div>
                 <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
                   <TrendingUp className="h-3 w-3 mr-1" />
-                  +15% mejora
+                  Bienestar Activo
                 </Badge>
               </div>
 
@@ -121,20 +174,20 @@ export default function DashboardPage() {
 
               <div className="flex items-center gap-6 pt-4 border-t border-border">
                 <div>
-                  <p className="text-3xl font-serif font-bold">7</p>
+                  <p className="text-3xl font-serif font-bold">{stats.streak}</p>
                   <p className="text-xs text-muted-foreground">dias de racha</p>
                 </div>
                 <div className="w-px h-10 bg-border" />
                 <div>
-                  <p className="text-3xl font-serif font-bold">23</p>
-                  <p className="text-xs text-muted-foreground">conversaciones</p>
+                  <p className="text-3xl font-serif font-bold">{stats.totalConvs}</p>
+                  <p className="text-xs text-muted-foreground">mensajes</p>
                 </div>
                 <div className="w-px h-10 bg-border" />
                 <div className="flex items-center gap-2">
                   <Flame className="h-6 w-6 text-orange-500" />
                   <div>
-                    <p className="font-semibold">Racha activa</p>
-                    <p className="text-xs text-muted-foreground">Sigue asi!</p>
+                    <p className="font-semibold">Mente en calma</p>
+                    <p className="text-xs text-muted-foreground">¡Buen trabajo!</p>
                   </div>
                 </div>
               </div>
@@ -186,18 +239,23 @@ export default function DashboardPage() {
                 </Button>
               </div>
               <div className="space-y-3">
-                {recentConversations.map((conv, i) => (
-                  <div
-                    key={i}
-                    className="p-4 rounded-2xl bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-medium">{conv.date}</p>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
-                    </div>
-                    <p className="text-sm text-muted-foreground line-clamp-1">{conv.preview}</p>
-                  </div>
-                ))}
+                {recentHistory.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No hay conversaciones recientes.</p>
+                ) : (
+                  recentHistory.map((conv, i) => (
+                    <Link href="/chat" key={i}>
+                      <div className="p-4 rounded-2xl bg-muted/50 hover:bg-muted transition-colors cursor-pointer group">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm font-medium">
+                            {conv.timestamp?.toDate ? format(conv.timestamp.toDate(), "d MMM, HH:mm", { locale: es }) : "Reciente"}
+                          </p>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+                        </div>
+                        <p className="text-sm text-muted-foreground line-clamp-1">{conv.content}</p>
+                      </div>
+                    </Link>
+                  ))
+                )}
               </div>
             </div>
           </motion.div>
@@ -213,26 +271,32 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-primary" />
-                  Recomendaciones para ti
+                  Herramientas para ti
                 </h3>
               </div>
               <div className="space-y-3">
-                {recommendations.map((rec, i) => (
-                  <div
-                    key={i}
-                    className={`p-4 rounded-2xl bg-gradient-to-r ${rec.color} cursor-pointer hover:scale-[1.02] transition-transform`}
-                  >
+                <Link href="/resources">
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-primary/20 to-primary/10 cursor-pointer hover:scale-[1.02] transition-transform mb-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="font-medium mb-1">{rec.title}</h4>
-                        <p className="text-sm text-muted-foreground">{rec.description}</p>
+                        <h4 className="font-medium mb-1">Respirador Zen</h4>
+                        <p className="text-sm text-muted-foreground">Técnica 4-7-8 para calmar el estrés</p>
                       </div>
-                      <Button variant="ghost" size="icon" className="rounded-xl">
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
+                      <ArrowRight className="h-4 w-4" />
                     </div>
                   </div>
-                ))}
+                </Link>
+                <Link href="/resources">
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-secondary/20 to-secondary/10 cursor-pointer hover:scale-[1.02] transition-transform mb-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium mb-1">Artículos de Expertos</h4>
+                        <p className="text-sm text-muted-foreground">Lecturas recomendadas para hoy</p>
+                      </div>
+                      <ArrowRight className="h-4 w-4" />
+                    </div>
+                  </div>
+                </Link>
               </div>
             </div>
           </motion.div>
