@@ -136,15 +136,32 @@ export default function ChatPage() {
 
       const data = await response.json();
       const botResponse = data.response || "Lo siento, tuve un problema al procesar tu mensaje.";
+      const riskLevel = data.risk_level || "BAJO";
+      const riskAnalysis = data.risk_analysis || "";
 
-      // 4. Guardar respuesta del asistente en Firestore privado
+      // 4. Si el riesgo es ALTO, generar alerta para psicólogos
+      if (riskLevel === "ALTO") {
+        await addDoc(collection(db, "emergency_alerts"), {
+          userId: user.uid,
+          userName: user.displayName || "Usuario Anónimo",
+          userEmail: user.email,
+          message: messageText,
+          riskAnalysis: riskAnalysis,
+          timestamp: serverTimestamp(),
+          status: "PENDIENTE", // Para que el psicólogo la marque como atendida
+        });
+        console.warn("⚠️ ALERTA DE RIESGO DETECTADA: Enviada a profesionales.");
+      }
+
+      // 5. Guardar respuesta del asistente en Firestore privado
       await addDoc(collection(db, "users", user.uid, "chat_history"), {
         role: "assistant",
         content: botResponse,
+        risk_level: riskLevel,
         timestamp: serverTimestamp(),
       });
 
-      // 5. Registrar respuesta en BigQuery
+      // 6. Registrar respuesta en BigQuery (incluyendo el nivel de riesgo)
       fetch('http://localhost:8081/api/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -152,6 +169,8 @@ export default function ChatPage() {
           user_id: user.uid,
           role: "assistant",
           content: botResponse,
+          risk_level: riskLevel,
+          risk_analysis: riskAnalysis,
           timestamp: new Date().toISOString()
         })
       }).catch(err => console.error("Error logging assistant to BigQuery:", err));
