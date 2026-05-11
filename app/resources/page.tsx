@@ -31,71 +31,8 @@ const featuredResource = {
   category: "Meditacion",
 }
 
-const resources = [
-  {
-    id: 1,
-    type: "article",
-    title: "5 tecnicas de respiracion para calmar la ansiedad",
-    description: "Ejercicios simples que puedes hacer en cualquier momento.",
-    duration: "5 min",
-    category: "Ansiedad",
-    icon: Wind,
-    color: "from-blue-500/20 to-cyan-500/20",
-  },
-  {
-    id: 2,
-    type: "audio",
-    title: "Sonidos de la naturaleza para dormir",
-    description: "Audio inmersivo con sonidos del bosque.",
-    duration: "30 min",
-    category: "Sueno",
-    icon: Moon,
-    color: "from-indigo-500/20 to-purple-500/20",
-  },
-  {
-    id: 3,
-    type: "article",
-    title: "Como construir una rutina de autocuidado",
-    description: "Guia paso a paso para crear habitos saludables.",
-    duration: "8 min",
-    category: "Autocuidado",
-    icon: Heart,
-    color: "from-pink-500/20 to-rose-500/20",
-  },
-  {
-    id: 4,
-    type: "video",
-    title: "Yoga suave para reducir el estres",
-    description: "Secuencia que puedes practicar en casa.",
-    duration: "20 min",
-    category: "Ejercicio",
-    icon: Sparkles,
-    color: "from-amber-500/20 to-orange-500/20",
-  },
-  {
-    id: 5,
-    type: "article",
-    title: "Entendiendo las emociones dificiles",
-    description: "Estrategias para procesar emociones complejas.",
-    duration: "12 min",
-    category: "Emociones",
-    icon: Heart,
-    color: "from-red-500/20 to-pink-500/20",
-  },
-  {
-    id: 6,
-    type: "audio",
-    title: "Afirmaciones positivas para el dia",
-    description: "Comienza tu manana con energia positiva.",
-    duration: "5 min",
-    category: "Motivacion",
-    icon: Sparkles,
-    color: "from-green-500/20 to-emerald-500/20",
-  },
-]
-
-const articleContents: Record<number, { title: string, content: React.ReactNode }> = {
-  1: {
+const articleContents: Record<string, { title: string, content: React.ReactNode }> = {
+  "s1": {
     title: "5 Técnicas de Respiración para la Ansiedad",
     content: (
       <div className="space-y-6 text-slate-700">
@@ -117,7 +54,7 @@ const articleContents: Record<number, { title: string, content: React.ReactNode 
       </div>
     )
   },
-  3: {
+  "s3": {
     title: "Rutina de Autocuidado Diario",
     content: (
       <div className="space-y-6 text-slate-700">
@@ -139,7 +76,7 @@ const articleContents: Record<number, { title: string, content: React.ReactNode 
       </div>
     )
   },
-  5: {
+  "s5": {
     title: "Entendiendo las Emociones Dificiles",
     content: (
       <div className="space-y-6 text-slate-700">
@@ -198,6 +135,36 @@ const staticResources = [
     category: "Autocuidado",
     icon: Heart,
     color: "from-pink-500/20 to-rose-500/20",
+  },
+  {
+    id: "s4",
+    type: "video",
+    title: "Yoga suave para reducir el estres",
+    description: "Secuencia que puedes practicar en casa.",
+    duration: "20 min",
+    category: "Ejercicio",
+    icon: Sparkles,
+    color: "from-amber-500/20 to-orange-500/20",
+  },
+  {
+    id: "s5",
+    type: "article",
+    title: "Entendiendo las emociones dificiles",
+    description: "Estrategias para procesar emociones complejas.",
+    duration: "12 min",
+    category: "Emociones",
+    icon: Heart,
+    color: "from-red-500/20 to-pink-500/20",
+  },
+  {
+    id: "s6",
+    type: "audio",
+    title: "Afirmaciones positivas para el dia",
+    description: "Comienza tu manana con energia positiva.",
+    duration: "5 min",
+    category: "Motivacion",
+    icon: Sparkles,
+    color: "from-green-500/20 to-emerald-500/20",
   },
 ]
 
