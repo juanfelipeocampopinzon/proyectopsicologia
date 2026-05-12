@@ -15,6 +15,7 @@ import { onAuthStateChanged } from "firebase/auth"
 import { useRouter } from "next/navigation"
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { chatWithGemini, logToBigQuery } from "./actions";
 
 interface Message {
   id: string
@@ -194,19 +195,14 @@ export default function ChatPage() {
           });
         }
 
-        // 2. Registrar en BigQuery
-        const bigqueryUrl = process.env.NEXT_PUBLIC_BIGQUERY_API_URL || 'http://localhost:8081';
-        fetch(`${bigqueryUrl}/api/log`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: user.uid,
-            session_id: sessionId,
-            role: "user",
-            content: messageText,
-            timestamp: new Date().toISOString()
-          })
-        }).catch(err => console.error("Error logging to BigQuery:", err));
+        // 2. Registrar en BigQuery a través de Server Action
+        logToBigQuery({
+          user_id: user.uid,
+          session_id: sessionId,
+          role: "user",
+          content: messageText,
+          timestamp: new Date().toISOString()
+        });
       }
 
       // 3. Obtener respuesta de Gemini Service (SOLO SI NO HAY INTERVENCION HUMANA)
@@ -215,17 +211,10 @@ export default function ChatPage() {
         return;
       }
 
-      const geminiUrl = process.env.NEXT_PUBLIC_GEMINI_API_URL || 'http://localhost:8080';
-      const response = await fetch(`${geminiUrl}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: messages.concat(newUserMsg)
-            .map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }))
-        })
-      });
+      const geminiMessages = messages.concat(newUserMsg)
+        .map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
 
-      const data = await response.json();
+      const data = await chatWithGemini(geminiMessages);
       const botResponse = data.response || "Lo siento, tuve un problema al procesar tu mensaje.";
       const riskLevel = (data.risk_level || "BAJO").toUpperCase();
       const riskAnalysis = data.risk_analysis || "";
@@ -267,19 +256,14 @@ export default function ChatPage() {
           timestamp: serverTimestamp(),
         });
 
-        const bigqueryUrl = process.env.NEXT_PUBLIC_BIGQUERY_API_URL || 'http://localhost:8081';
-        fetch(`${bigqueryUrl}/api/log`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: user.uid,
-            session_id: sessionId,
-            role: "assistant",
-            content: botResponse,
-            risk_level: riskLevel,
-            timestamp: new Date().toISOString()
-          })
-        }).catch(err => console.error("Error logging assistant to BigQuery:", err));
+        logToBigQuery({
+          user_id: user.uid,
+          session_id: sessionId,
+          role: "assistant",
+          content: botResponse,
+          risk_level: riskLevel,
+          timestamp: new Date().toISOString()
+        });
       }
 
     } catch (error) {
