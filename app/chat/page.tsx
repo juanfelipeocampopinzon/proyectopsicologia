@@ -195,7 +195,8 @@ export default function ChatPage() {
         }
 
         // 2. Registrar en BigQuery
-        fetch('http://localhost:8081/api/log', {
+        const bigqueryUrl = process.env.NEXT_PUBLIC_BIGQUERY_API_URL || 'http://localhost:8081';
+        fetch(`${bigqueryUrl}/api/log`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -214,7 +215,8 @@ export default function ChatPage() {
         return;
       }
 
-      const response = await fetch('http://localhost:8080/api/chat', {
+      const geminiUrl = process.env.NEXT_PUBLIC_GEMINI_API_URL || 'http://localhost:8080';
+      const response = await fetch(`${geminiUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -265,7 +267,8 @@ export default function ChatPage() {
           timestamp: serverTimestamp(),
         });
 
-        fetch('http://localhost:8081/api/log', {
+        const bigqueryUrl = process.env.NEXT_PUBLIC_BIGQUERY_API_URL || 'http://localhost:8081';
+        fetch(`${bigqueryUrl}/api/log`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
