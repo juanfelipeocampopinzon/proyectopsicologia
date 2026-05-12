@@ -49,9 +49,4 @@ jobs:
             BQ_DATASET=psicologia_data
             BQ_TABLE=chat_logs
 
-      - name: 'Make Service Public (Allow Unauthenticated)'
-        run: |
-          gcloud run services add-iam-policy-binding ${{ env.SERVICE_NAME }} \
-            --region=${{ env.REGION }} \
-            --member="allUsers" \
-            --role="roles/run.invoker"
+
