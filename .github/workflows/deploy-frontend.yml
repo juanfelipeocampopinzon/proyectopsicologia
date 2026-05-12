@@ -29,9 +29,13 @@ jobs:
         with:
           credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
 
-      - name: 'Preparar Variables de Entorno (.env.production)'
+      - name: 'Preparar Variables de Entorno (.env)'
         run: |
-          echo "NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY || 'AIzaSyDR8cSmc2cZysbRSkQvKjw77JAZjUp_UT0' }}" >> .env
+          if [ -z "${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}" ]; then
+            echo "Falta el secret NEXT_PUBLIC_FIREBASE_API_KEY en GitHub Actions."
+            exit 1
+          fi
+          echo "NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}" >> .env
           echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=psicologia-bc048.firebaseapp.com" >> .env
           echo "NEXT_PUBLIC_FIREBASE_PROJECT_ID=psicologia-bc048" >> .env
           echo "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=psicologia-bc048.firebasestorage.app" >> .env

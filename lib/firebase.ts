@@ -10,22 +10,40 @@ const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-let app: FirebaseApp | any;
-let db: Firestore | any;
-let auth: Auth | any;
-let analytics: Analytics | any = null;
+const isFirebaseConfigured = [
+  firebaseConfig.apiKey,
+  firebaseConfig.authDomain,
+  firebaseConfig.projectId,
+  firebaseConfig.appId,
+].every(Boolean);
 
-try {
-  app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-  db = getFirestore(app);
-  auth = getAuth(app);
-  // Analytics solo funciona en el cliente (navegador)
-  analytics = typeof window !== "undefined" ? isSupported().then(yes => yes ? getAnalytics(app) : null) : null;
-} catch (error) {
-  console.warn("⚠️ Advertencia: No se pudo inicializar Firebase. Posiblemente faltan variables de entorno durante la compilación.", error);
+let app: FirebaseApp | any = null;
+let db: Firestore | any = null;
+let auth: Auth | any = null;
+let analytics: Analytics | Promise<Analytics | null> | null = null;
+
+if (isFirebaseConfigured) {
+  try {
+    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    db = getFirestore(app);
+    auth = getAuth(app);
+    analytics =
+      typeof window !== "undefined"
+        ? isSupported().then((yes) => (yes && app ? getAnalytics(app) : null))
+        : null;
+  } catch (error) {
+    console.warn(
+      "Advertencia: No se pudo inicializar Firebase. Revisa las variables NEXT_PUBLIC_FIREBASE_* del build.",
+      error
+    );
+  }
+} else {
+  console.warn(
+    "Advertencia: Firebase no esta configurado. Faltan variables NEXT_PUBLIC_FIREBASE_* durante el build."
+  );
 }
 
-export { app, db, auth, analytics };
+export { app, db, auth, analytics, isFirebaseConfigured };

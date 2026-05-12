@@ -15,6 +15,8 @@ export default function LandingPage() {
   const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!auth || !db) return;
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
@@ -32,6 +34,8 @@ export default function LandingPage() {
   };
 
   const handleLogout = async () => {
+    if (!auth) return;
+
     try {
       await signOut(auth);
       window.location.reload(); // Recargar para limpiar estado
