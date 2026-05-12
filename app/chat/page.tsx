@@ -219,11 +219,11 @@ export default function ChatPage() {
       const riskLevel = (data.risk_level || "BAJO").toUpperCase();
       const riskAnalysis = data.risk_analysis || "";
 
-      console.log("🔍 Análisis de Riesgo LUMEN:", { riskLevel, riskAnalysis });
+
 
       // 4. Alerta ALTO (Incluye sessionId y sessionTitle)
       if (riskLevel === "ALTO") {
-        console.log("🚨 ALERTA ROJA DETECTADA - Enviando a Dashboard...");
+
         // Obtener el título de la sesión actual
         let currentTitle = "Chat sin título";
         if (user && sessionId) {
