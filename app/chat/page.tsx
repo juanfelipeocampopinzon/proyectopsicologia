@@ -127,7 +127,7 @@ export default function ChatPage() {
         setMessages([{
           id: "welcome",
           role: "assistant",
-          content: `Hola ${user.displayName || "amigo"}, soy LUMEN. Estoy aqui para escucharte sin juzgar. ¿Como te sientes hoy?`,
+          content: `Hola ${user.displayName || "compañero"}, soy la Dra. Alma de LUMEN. Estoy aquí para apoyarte en tu camino en la **UCC**. Ya sea por estrés académico o algo personal, este es tu espacio seguro. ¿Cómo te sientes hoy?`,
           timestamp: new Date()
         }]);
       } else {
@@ -138,13 +138,13 @@ export default function ChatPage() {
     return () => unsubscribe();
   }, [user, currentSessionId])
 
-  // Inicialización para invitados
+  // Inicialización para invitados UCC
   useEffect(() => {
     if (!user && !loading) {
       setMessages([{
         id: "guest-welcome",
         role: "assistant",
-        content: "Hola, soy LUMEN. Como invitado, nuestra conversación es privada y no se guardará. Si deseas mantener un historial, por favor inicia sesión.",
+        content: "Bienvenido a LUMEN UCC. Como invitado, puedes hablar conmigo de forma privada. Si eres estudiante de la **Universidad Cooperativa de Colombia**, te sugiero iniciar sesión para guardar tu proceso.",
         timestamp: new Date()
       }]);
     }
@@ -388,7 +388,7 @@ export default function ChatPage() {
             >
               <Menu className="h-6 w-6" />
             </Button>
-            <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
               <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/20">
                 <Sparkles className="h-5 w-5" />
               </div>
@@ -396,10 +396,10 @@ export default function ChatPage() {
                 <h1 className="font-serif font-bold text-lg leading-tight">LUMEN</h1>
                 <p className="text-[10px] text-emerald-500 font-bold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  SOPORTE ACTIVO
+                  BIENESTAR ESTUDIANTIL UCC
                 </p>
               </div>
-            </div>
+            </Link>
           </div>
           <Link href="/emergency">
             <Button

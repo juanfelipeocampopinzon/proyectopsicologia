@@ -106,14 +106,14 @@ export default function LandingPage() {
             transition={{ duration: 0.6 }}
           >
             <span className="inline-block px-4 py-1.5 mb-6 text-sm font-bold tracking-wider text-primary uppercase bg-primary/10 rounded-full">
-              Salud Mental Inteligente
+              Bienestar Universitario UCC
             </span>
             <h1 className="text-6xl md:text-8xl font-serif font-bold leading-tight mb-8 tracking-tighter">
               Tu luz en el camino <br /> 
-              <span className="text-slate-400 italic">hacia el bienestar.</span>
+              <span className="text-slate-400 italic text-5xl md:text-7xl">estudiantil UCC.</span>
             </h1>
             <p className="max-w-2xl mx-auto text-xl text-slate-500 leading-relaxed mb-12">
-              LUMEN combina la inteligencia artificial más avanzada con la ética clínica para ofrecerte un espacio seguro, privado y disponible 24/7.
+              LUMEN es la plataforma de apoyo emocional diseñada para la **Universidad Cooperativa de Colombia**. Combinamos IA avanzada con ética clínica para cuidarte 24/7.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
@@ -150,18 +150,18 @@ export default function LandingPage() {
             {[
               {
                 icon: <Brain className="h-8 w-8" />,
-                title: "IA Empática",
-                desc: "Basada en Terapia Cognitivo-Conductual para ofrecerte reflexiones valiosas en cualquier momento."
+                title: "Enfoque Estudiantil",
+                desc: "IA entrenada para entender el estrés académico, parciales y la vida universitaria en la UCC."
               },
               {
                 icon: <Shield className="h-8 w-8" />,
-                title: "Privacidad Total",
-                desc: "Tus conversaciones son privadas y están protegidas con los más altos estándares de seguridad."
+                title: "Privacidad UCC",
+                desc: "Tus conversaciones son anónimas y seguras. Un espacio libre de juicios para el estudiante."
               },
               {
                 icon: <UserCircle className="h-8 w-8" />,
-                title: "Red de Apoyo",
-                desc: "En caso de crisis, nuestro sistema alerta automáticamente a profesionales calificados."
+                title: "Respaldo Profesional",
+                desc: "Conectado directamente con la red de Bienestar Estudiantil UCC para casos que requieran atención humana."
               }
             ].map((feature, i) => (
               <motion.div 
