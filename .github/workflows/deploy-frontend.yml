@@ -31,15 +31,15 @@ jobs:
 
       - name: 'Preparar Variables de Entorno (.env.production)'
         run: |
-          echo "NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY || 'AIzaSyDR8cSmc2cZysbRSkQvKjw77JAZjUp_UT0' }}" >> .env.production
-          echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=psicologia-bc048.firebaseapp.com" >> .env.production
-          echo "NEXT_PUBLIC_FIREBASE_PROJECT_ID=psicologia-bc048" >> .env.production
-          echo "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=psicologia-bc048.firebasestorage.app" >> .env.production
-          echo "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=538379484506" >> .env.production
-          echo "NEXT_PUBLIC_FIREBASE_APP_ID=1:538379484506:web:acf4e1a00899862089c763" >> .env.production
-          echo "NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=G-2ETMHMFPH5" >> .env.production
-          echo "NEXT_PUBLIC_BIGQUERY_API_URL=https://psicologia-bigquery-service-124713725529.us-central1.run.app" >> .env.production
-          echo "NEXT_PUBLIC_GEMINI_API_URL=https://psicologia-gemini-service-124713725529.us-central1.run.app" >> .env.production
+          echo "NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY || 'AIzaSyDR8cSmc2cZysbRSkQvKjw77JAZjUp_UT0' }}" >> .env
+          echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=psicologia-bc048.firebaseapp.com" >> .env
+          echo "NEXT_PUBLIC_FIREBASE_PROJECT_ID=psicologia-bc048" >> .env
+          echo "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=psicologia-bc048.firebasestorage.app" >> .env
+          echo "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=538379484506" >> .env
+          echo "NEXT_PUBLIC_FIREBASE_APP_ID=1:538379484506:web:acf4e1a00899862089c763" >> .env
+          echo "NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=G-2ETMHMFPH5" >> .env
+          echo "NEXT_PUBLIC_BIGQUERY_API_URL=https://psicologia-bigquery-service-124713725529.us-central1.run.app" >> .env
+          echo "NEXT_PUBLIC_GEMINI_API_URL=https://psicologia-gemini-service-124713725529.us-central1.run.app" >> .env
 
       - name: 'Deploy a Cloud Run'
         uses: 'google-github-actions/deploy-cloudrun@v2'

@@ -13,12 +13,19 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// Inicializar Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const db = getFirestore(app);
-const auth = getAuth(app);
+let app;
+let db;
+let auth;
+let analytics = null;
 
-// Analytics solo funciona en el cliente (navegador)
-const analytics = typeof window !== "undefined" ? isSupported().then(yes => yes ? getAnalytics(app) : null) : null;
+try {
+  app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  db = getFirestore(app);
+  auth = getAuth(app);
+  // Analytics solo funciona en el cliente (navegador)
+  analytics = typeof window !== "undefined" ? isSupported().then(yes => yes ? getAnalytics(app) : null) : null;
+} catch (error) {
+  console.warn("⚠️ Advertencia: No se pudo inicializar Firebase. Posiblemente faltan variables de entorno durante la compilación.", error);
+}
 
 export { app, db, auth, analytics };
