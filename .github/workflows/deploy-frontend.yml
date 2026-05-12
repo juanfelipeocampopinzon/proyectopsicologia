@@ -46,5 +46,4 @@ jobs:
         with:
           service: '${{ env.SERVICE_NAME }}'
           region: '${{ env.REGION }}'
-          source: '.' # Ejecuta Google Cloud Buildpacks sobre la raíz (Next.js)
-          flags: '--set-build-env-vars=NPM_CONFIG_LEGACY_PEER_DEPS=true'
+          source: '.' # Ejecuta Docker automáticamente gracias al Dockerfile
