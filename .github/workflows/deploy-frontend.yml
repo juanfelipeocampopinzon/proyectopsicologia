@@ -6,7 +6,6 @@ on:
       - main
     paths-ignore:
       - 'backend/**' # Desplegará cuando se modifique cualquier cosa EXCEPTO el backend
-      - '.github/**'
 
 env:
   PROJECT_ID: microservicio-471115
@@ -48,3 +47,4 @@ jobs:
           service: '${{ env.SERVICE_NAME }}'
           region: '${{ env.REGION }}'
           source: '.' # Ejecuta Google Cloud Buildpacks sobre la raíz (Next.js)
+          flags: '--build-env-vars=NPM_CONFIG_LEGACY_PEER_DEPS=true'
