@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { db, auth } from "@/lib/firebase";
 import { collection, query, orderBy, onSnapshot, updateDoc, doc, getDoc, addDoc, serverTimestamp, setDoc } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,8 @@ import {
   ArrowRight,
   Sparkles,
   History as HistoryIcon,
-  ChevronLeft
+  ChevronLeft,
+  LogOut
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -72,6 +73,15 @@ export default function AlertsDashboard() {
   const paginate = (pageNumber: number) => {
     setCurrentPage(pageNumber);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      router.push("/login");
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+    }
   };
 
   const markAsResolved = async (alertId: string, userId: string) => {
@@ -262,13 +272,22 @@ export default function AlertsDashboard() {
               Alertas de Riesgo
             </h1>
           </div>
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-4 justify-end">
             <Link href="/dashboard/alerts/new-resource">
-              <Button className="h-16 px-8 rounded-2xl bg-primary shadow-xl shadow-primary/30 flex items-center gap-3 transition-all hover:scale-105 active:scale-95 text-lg">
-                <Plus className="h-6 w-6" />
-                Publicar Artículo
+              <Button className="h-14 md:h-16 px-6 md:px-8 rounded-2xl bg-primary shadow-xl shadow-primary/30 flex items-center gap-3 transition-all hover:scale-105 active:scale-95 md:text-lg">
+                <Plus className="h-5 w-5 md:h-6 md:w-6" />
+                <span className="hidden md:inline">Publicar Artículo</span>
+                <span className="md:hidden">Publicar</span>
               </Button>
             </Link>
+            <Button 
+              onClick={handleSignOut}
+              variant="outline"
+              className="h-14 md:h-16 px-4 md:px-6 rounded-2xl border-slate-200 text-slate-600 flex items-center gap-3 transition-all hover:bg-slate-100 hover:text-slate-900 md:text-lg"
+            >
+              <LogOut className="h-5 w-5 md:h-6 md:w-6" />
+              <span className="hidden md:inline">Cerrar Sesión</span>
+            </Button>
           </div>
         </div>
 
