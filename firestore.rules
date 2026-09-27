@@ -5,27 +5,33 @@ service cloud.firestore {
     
     function isPsicologo() {
       return request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "psicologo";
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == "psicologo";
     }
 
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
       allow read, create, update: if isPsicologo();
     }
-    
-    match /users/{userId}/chat_history/{docId} {
+
+    match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
-      allow read, create: if isPsicologo();
+      allow read, create, update: if isPsicologo();
     }
     
     match /emergency_alerts/{alertId} {
       allow create: if true; 
-      allow read, update, delete: if isPsicologo();
+      allow read: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid || isPsicologo());
+      allow update, delete: if isPsicologo();
     }
 
     match /resources/{resourceId} {
       allow read: if true; 
       allow write: if isPsicologo();
+    }
+
+    match /psychologist_feedback/{feedbackId} {
+      allow read, write: if isPsicologo();
     }
   }
 }

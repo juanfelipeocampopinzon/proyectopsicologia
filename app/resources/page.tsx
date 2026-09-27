@@ -176,14 +176,20 @@ export default function ResourcesPage() {
 
   useEffect(() => {
     const q = query(collection(db, "resources"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        icon: BookOpen, // Icono por defecto para artículos nuevos
-      }));
-      setDynamicResources(docs);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const docs = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          icon: BookOpen, // Icono por defecto para artículos nuevos
+        }));
+        setDynamicResources(docs);
+      },
+      (error) => {
+        console.warn("Snapshot error en resources:", error.message);
+      }
+    );
     return () => unsubscribe();
   }, []);
 

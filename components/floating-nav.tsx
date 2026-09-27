@@ -24,6 +24,9 @@ export function FloatingNav() {
   const [isDark, setIsDark] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
 
+  // La página /chat tiene su propio header completo — no superponer la nav flotante
+  const hiddenPaths = ["/chat"]
+
   const handleLogout = async () => {
     try {
       await signOut(auth)
@@ -53,6 +56,8 @@ export function FloatingNav() {
     localStorage.setItem("darkMode", String(newMode))
     document.documentElement.classList.toggle("dark")
   }
+
+  if (hiddenPaths.includes(pathname ?? "")) return null
 
   return (
     <>

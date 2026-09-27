@@ -16,33 +16,36 @@ const fraunces = Fraunces({
   variable: "--font-serif",
 })
 
-const nunito = DM_Sans({ // Declared the nunito variable here
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-sans",
-})
 
 export const metadata: Metadata = {
-  title: "LUMEN - Tu apoyo emocional",
+  title: "LUMEN – Bienestar Estudiantil UCC",
   description:
-    "Una luz en tus momentos difíciles. Plataforma de apoyo emocional con IA y profesionales de salud mental.",
-  generator: "v0.app",
+    "Plataforma de apoyo emocional y salud mental para la Universidad Cooperativa de Colombia. Acompañamiento con IA y profesionales certificados.",
   icons: {
     icon: [
-      {
-        url: "/icon-light-32x32.png",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/icon-dark-32x32.png",
-        media: "(prefers-color-scheme: dark)",
-      },
       {
         url: "/icon.svg",
         type: "image/svg+xml",
       },
+      {
+        url: "/icon-light-32x32.png",
+        sizes: "32x32",
+        type: "image/png",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/icon-dark-32x32.png",
+        sizes: "32x32",
+        type: "image/png",
+        media: "(prefers-color-scheme: dark)",
+      },
     ],
-    apple: "/apple-icon.png",
+    apple: {
+      url: "/apple-icon.png",
+      sizes: "180x180",
+      type: "image/png",
+    },
+    shortcut: "/icon.svg",
   },
 }
 
@@ -53,7 +56,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning>
-      <body className={`${dmSans.variable} ${fraunces.variable} font-sans antialiased`}>
+      <body
+        className={`${dmSans.variable} ${fraunces.variable} font-sans antialiased`}
+        suppressHydrationWarning
+      >
         {children}
         <Analytics />
       </body>

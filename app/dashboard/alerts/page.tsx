@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { db, auth } from "@/lib/firebase";
 import { collection, query, orderBy, onSnapshot, updateDoc, doc, getDoc, addDoc, serverTimestamp, setDoc } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -15,19 +15,28 @@ import {
   Clock, 
   User, 
   ExternalLink,
-  ShieldAlert,
-  Search,
-  X,
-  MessageSquare,
-  Plus,
-  ArrowRight,
-  Sparkles,
-  History as HistoryIcon,
-  ChevronLeft
+  ShieldAlert, 
+  Search, 
+  X, 
+  MessageSquare, 
+  Plus, 
+  ArrowRight, 
+  Sparkles, 
+  History as HistoryIcon, 
+  ChevronLeft, 
+  LogOut, 
+  TrendingUp, 
+  LineChart, 
+  Shield, 
+  ShieldCheck, 
+  UserCheck,
+  Stethoscope,
+  Check
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { PsychologistFeedbackModal, FeedbackTarget } from "@/components/psychologist-feedback-modal";
 
 interface Alert {
   id: string;
@@ -40,6 +49,10 @@ interface Alert {
   riskAnalysis: string;
   timestamp: any;
   status: "PENDIENTE" | "ATENDIDA";
+  isAnonymous?: boolean;
+  validationStatus?: "CORRECTO" | "INCORRECTO" | "SOBREESTIMADO" | "SUBESTIMADO";
+  calibratedRisk?: "BAJO" | "MEDIO" | "ALTO";
+  professionalNotes?: string;
 }
 
 interface Message {
@@ -60,6 +73,8 @@ export default function AlertsDashboard() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [isIntervening, setIsIntervening] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [feedbackTarget, setFeedbackTarget] = useState<FeedbackTarget | null>(null);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const itemsPerPage = 5;
   const router = useRouter();
 
@@ -72,6 +87,15 @@ export default function AlertsDashboard() {
   const paginate = (pageNumber: number) => {
     setCurrentPage(pageNumber);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      router.push("/login");
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+    }
   };
 
   const markAsResolved = async (alertId: string, userId: string) => {
@@ -128,24 +152,31 @@ export default function AlertsDashboard() {
       orderBy("timestamp", "desc")
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const loadedAlerts = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Alert[];
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const loadedAlerts = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Alert[];
 
-      // Si hay una alerta nueva PENDIENTE, sonar alarma
-      if (loadedAlerts.length > 0) {
-        const newestAlert = loadedAlerts[0];
-        if (newestAlert.status === "PENDIENTE" && lastAlertId && newestAlert.id !== lastAlertId) {
-          playAlertSound();
+        // Si hay una alerta nueva PENDIENTE, sonar alarma
+        if (loadedAlerts.length > 0) {
+          const newestAlert = loadedAlerts[0];
+          if (newestAlert.status === "PENDIENTE" && lastAlertId && newestAlert.id !== lastAlertId) {
+            playAlertSound();
+          }
+          setLastAlertId(newestAlert.id);
         }
-        setLastAlertId(newestAlert.id);
-      }
 
-      setAlerts(loadedAlerts);
-      setLoading(false);
-    });
+        setAlerts(loadedAlerts);
+        setLoading(false);
+      },
+      (error) => {
+        console.warn("Snapshot error en emergency_alerts:", error.message);
+        setLoading(false);
+      }
+    );
 
     return () => unsubscribe();
   }, [user, lastAlertId]);
@@ -163,8 +194,12 @@ export default function AlertsDashboard() {
     setIsModalOpen(true);
     setSelectedUserHistory(null);
     
-    const userSnap = await getDoc(doc(db, "users", userId));
-    setIsIntervening(userSnap.data()?.isUnderCare || false);
+    try {
+      const userSnap = await getDoc(doc(db, "users", userId));
+      setIsIntervening(userSnap.data()?.isUnderCare || false);
+    } catch (err) {
+      console.warn("No se pudo leer isUnderCare:", err);
+    }
     
     try {
       const historyPath = sessionId 
@@ -173,10 +208,17 @@ export default function AlertsDashboard() {
 
       const q = query(historyPath, orderBy("timestamp", "asc"));
 
-      const unsub = onSnapshot(q, (snapshot) => {
-        const history = snapshot.docs.map(doc => doc.data()) as Message[];
-        setSelectedUserHistory(history);
-      });
+      const unsub = onSnapshot(
+        q,
+        (snapshot) => {
+          const history = snapshot.docs.map(doc => doc.data()) as Message[];
+          setSelectedUserHistory(history);
+        },
+        (error) => {
+          console.warn("Snapshot error al cargar historial:", error.message);
+          setSelectedUserHistory([]);
+        }
+      );
 
       setHistoryUnsubscribe(() => unsub);
     } catch (error) {
@@ -216,7 +258,6 @@ export default function AlertsDashboard() {
   const sendMessageAsProfessional = async (userId: string, text: string) => {
     if (!text.trim() || !selectedUserId) return;
     try {
-      // Necesitamos saber en qué sesión estamos interviniendo
       // Buscamos la alerta correspondiente para obtener el sessionId
       const alert = alerts.find(a => a.userId === userId);
       if (!alert) return;
@@ -231,6 +272,22 @@ export default function AlertsDashboard() {
     }
   };
 
+  const handleOpenFeedback = (alert: Alert) => {
+    setFeedbackTarget({
+      analysisId: `alert-eval-${alert.id}`,
+      alertId: alert.id,
+      sessionId: alert.sessionId,
+      sessionTitle: alert.sessionTitle,
+      userId: alert.userId,
+      userName: alert.userName,
+      userEmail: alert.userEmail,
+      aiRisk: "ALTO", // Alerta generada por riesgo ALTO de IA
+      aiConfidence: 91,
+      aiAnalysisText: alert.riskAnalysis || alert.message,
+    });
+    setIsFeedbackModalOpen(true);
+  };
+
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredAlerts = alerts.filter(alert => 
@@ -239,9 +296,11 @@ export default function AlertsDashboard() {
     alert.message.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const validatedCount = alerts.filter(a => a.validationStatus).length;
+
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="text-center">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50" suppressHydrationWarning>
+      <div className="text-center" suppressHydrationWarning>
         <div className="w-12 h-12 border-4 border-destructive border-t-transparent rounded-full animate-spin mx-auto mb-4" />
         <p className="text-slate-500 font-medium">Cargando centro de emergencias...</p>
       </div>
@@ -249,36 +308,51 @@ export default function AlertsDashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 md:p-12 relative">
+    <div className="min-h-screen bg-slate-50 p-6 md:p-12 relative" suppressHydrationWarning>
       <div className="max-w-6xl mx-auto">
         {/* HEADER MEJORADO */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
           <div>
             <div className="flex items-center gap-2 text-primary mb-2 font-bold tracking-wider text-sm uppercase">
               <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-              Centro de Monitoreo Crítico
+              Centro de Monitoreo Crítico & Supervisión
             </div>
             <h1 className="text-4xl md:text-5xl font-serif font-bold text-slate-900 tracking-tight">
               Alertas de Riesgo
             </h1>
           </div>
-          <div className="flex gap-4">
-            <Link href="/dashboard/alerts/new-resource">
-              <Button className="h-16 px-8 rounded-2xl bg-primary shadow-xl shadow-primary/30 flex items-center gap-3 transition-all hover:scale-105 active:scale-95 text-lg">
-                <Plus className="h-6 w-6" />
-                Publicar Artículo
+          <div className="flex flex-wrap gap-4 justify-end">
+            <Link href="/dashboard/tracking">
+              <Button className="h-14 md:h-16 px-6 md:px-8 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-500/20 flex items-center gap-3 transition-all hover:scale-105 active:scale-95 md:text-lg">
+                <TrendingUp className="h-5 w-5 md:h-6 md:w-6" />
+                <span>Seguimiento Pacientes</span>
               </Button>
             </Link>
+            <Link href="/dashboard/alerts/new-resource">
+              <Button className="h-14 md:h-16 px-6 md:px-8 rounded-2xl bg-primary shadow-xl shadow-primary/30 flex items-center gap-3 transition-all hover:scale-105 active:scale-95 md:text-lg">
+                <Plus className="h-5 w-5 md:h-6 md:w-6" />
+                <span className="hidden md:inline">Publicar Artículo</span>
+                <span className="md:hidden">Publicar</span>
+              </Button>
+            </Link>
+            <Button 
+              onClick={handleSignOut}
+              variant="outline"
+              className="h-14 md:h-16 px-4 md:px-6 rounded-2xl border-slate-200 text-slate-600 flex items-center gap-3 transition-all hover:bg-slate-100 hover:text-slate-900 md:text-lg"
+            >
+              <LogOut className="h-5 w-5 md:h-6 md:w-6" />
+              <span className="hidden md:inline">Cerrar Sesión</span>
+            </Button>
           </div>
         </div>
 
-        {/* MÉTRICAS PRO (KPIs) */}
+        {/* MÉTRICAS PRO (KPIS CON VALIDACIÓN RLHF) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           {[
             { label: "Alertas Pendientes", value: alerts.filter(a => a.status === "PENDIENTE").length, icon: AlertTriangle, color: "text-destructive", bg: "bg-destructive/5" },
             { label: "Casos Atendidos", value: alerts.filter(a => a.status === "ATENDIDA").length, icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50" },
+            { label: "Validaciones Clínicas (RLHF)", value: `${validatedCount}/${alerts.length}`, icon: Stethoscope, color: "text-indigo-600", bg: "bg-indigo-50" },
             { label: "Usuarios en Riesgo", value: new Set(alerts.map(a => a.userId)).size, icon: User, color: "text-blue-600", bg: "bg-blue-50" },
-            { label: "Tiempo de Respuesta", value: "4.2 min", icon: Clock, color: "text-amber-600", bg: "bg-amber-50" },
           ].map((stat, i) => (
             <motion.div
               key={i}
@@ -318,7 +392,7 @@ export default function AlertsDashboard() {
 
         <div className="grid gap-6 pb-20">
           <AnimatePresence mode="wait">
-            {currentAlerts.length === 0 ? (
+            {filteredAlerts.length === 0 ? (
               <motion.div 
                 key="empty"
                 initial={{ opacity: 0 }}
@@ -348,17 +422,40 @@ export default function AlertsDashboard() {
                   >
                     <div className="p-6 md:p-8 flex flex-col md:flex-row gap-6">
                       <div className="flex-1 space-y-4">
-                        {/* Info del Usuario Restaurada */}
+                        {/* Info del Usuario */}
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-3">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg ${
-                              alert.status === "PENDIENTE" ? "bg-destructive" : "bg-slate-400"
-                            }`}>
-                              <User className="h-6 w-6" />
+                            <div className={cn(
+                              "w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg",
+                              alert.isAnonymous || alert.userName?.toLowerCase().includes("anónimo")
+                                ? "bg-purple-600"
+                                : (alert.status === "PENDIENTE" ? "bg-destructive" : "bg-slate-400")
+                            )}>
+                              {alert.isAnonymous || alert.userName?.toLowerCase().includes("anónimo") ? (
+                                <Shield className="h-6 w-6" />
+                              ) : (
+                                <User className="h-6 w-6" />
+                              )}
                             </div>
                             <div>
-                              <h3 className="font-bold text-slate-800 leading-none mb-1">{alert.userName}</h3>
-                              <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-bold text-slate-800 leading-none">{alert.userName}</h3>
+                                {alert.isAnonymous || alert.userName?.toLowerCase().includes("anónimo") ? (
+                                  <Badge className="bg-purple-100 text-purple-800 border border-purple-200 text-[10px] font-bold">
+                                    🛡️ Caso Anónimo
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
+                                    👤 Identificado
+                                  </Badge>
+                                )}
+                                {alert.validationStatus && (
+                                  <Badge className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                                    👨‍⚕️ Validado: {alert.validationStatus}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-1">
                                 <span className="flex items-center gap-1">
                                   <HistoryIcon className="h-2.5 w-2.5" />
                                   {alert.timestamp?.toDate ? format(alert.timestamp.toDate(), "d MMM, HH:mm", { locale: es }) : "Reciente"}
@@ -368,7 +465,11 @@ export default function AlertsDashboard() {
                                   {alert.sessionTitle || "General"}
                                 </span>
                               </div>
-                              <p className="text-[11px] text-slate-500 mt-1">{alert.userEmail}</p>
+                              <p className="text-[11px] text-slate-500 mt-1">
+                                {alert.isAnonymous || alert.userName?.toLowerCase().includes("anónimo")
+                                  ? "Privacidad activa • Intervención vía chat"
+                                  : alert.userEmail}
+                              </p>
                             </div>
                           </div>
                           <Badge variant={alert.status === "PENDIENTE" ? "destructive" : "secondary"} className="rounded-full px-4 py-1">
@@ -397,6 +498,15 @@ export default function AlertsDashboard() {
                       </div>
 
                       <div className="flex flex-col gap-3 justify-start min-w-[200px]">
+                        {/* Botón de Validación Profesional (Módulo RLHF) */}
+                        <Button 
+                          onClick={() => handleOpenFeedback(alert)}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-11 shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 font-bold text-xs"
+                        >
+                          <Stethoscope className="h-4 w-4" />
+                          <span>{alert.validationStatus ? "Modificar Validación IA" : "Validar Análisis IA"}</span>
+                        </Button>
+
                         {alert.status === "PENDIENTE" ? (
                           <Button 
                             onClick={() => markAsResolved(alert.id, alert.userId)}
@@ -419,6 +529,16 @@ export default function AlertsDashboard() {
                           <MessageSquare className="mr-2 h-4 w-4" />
                           Ver Historial
                         </Button>
+
+                        <Link href={`/dashboard/tracking?userId=${alert.userId}`} className="w-full">
+                          <Button 
+                            variant="outline" 
+                            className="w-full rounded-xl h-11 border-indigo-200 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100/80 hover:text-indigo-800 transition-all flex items-center justify-center gap-2"
+                          >
+                            <TrendingUp className="h-4 w-4" />
+                            Seguimiento & Evolución
+                          </Button>
+                        </Link>
 
                         <div className="grid grid-cols-2 gap-2">
                           <Button variant="secondary" className="rounded-xl text-[10px] h-9" onClick={() => window.open(`mailto:${alert.userEmail}`)}>Email</Button>
@@ -584,6 +704,13 @@ export default function AlertsDashboard() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* MODAL DE RETROALIMENTACIÓN PROFESIONAL (RLHF) */}
+      <PsychologistFeedbackModal
+        isOpen={isFeedbackModalOpen}
+        onClose={() => setIsFeedbackModalOpen(false)}
+        target={feedbackTarget}
+      />
     </div>
   );
 }

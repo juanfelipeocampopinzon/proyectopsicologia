@@ -26,6 +26,12 @@ export default function RegisterPage() {
     setError("");
     setLoading(true);
 
+    if (!auth || !db) {
+      setError("Firebase no está configurado correctamente en el entorno. Revisa el archivo .env.local.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;

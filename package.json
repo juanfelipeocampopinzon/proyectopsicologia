@@ -5,6 +5,9 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
+    "dev:gemini": "npm --prefix backend/gemini-service run dev",
+    "dev:bigquery": "npm --prefix backend/bigquery-service run dev",
+    "dev:all": "concurrently -n \"NEXT,GEMINI,BIGQUERY\" -c \"cyan,magenta,yellow\" \"npm run dev\" \"npm run dev:gemini\" \"npm run dev:bigquery\"",
     "lint": "eslint .",
     "start": "next start"
   },
@@ -70,6 +73,7 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^10.0.5",
     "postcss": "^8.5",
     "tailwindcss": "^4.1.9",
     "tw-animate-css": "1.3.3",

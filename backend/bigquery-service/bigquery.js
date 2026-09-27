@@ -2,8 +2,8 @@ const { BigQuery } = require('@google-cloud/bigquery');
 require('dotenv').config();
 
 const projectId = process.env.PROJECT_ID || 'microservicio-471115';
-const datasetId = process.env.BQ_DATASET || 'psicologia_data';
-const tableId = process.env.BQ_TABLE || 'chat_logs';
+const datasetId = process.env.DATASET_ID || process.env.BQ_DATASET || 'psicologia_analytics';
+const tableId = process.env.TABLE_ID || process.env.BQ_TABLE || 'chat_logs';
 
 const bigquery = new BigQuery({
   projectId: projectId,
