@@ -178,8 +178,15 @@ export default function ChatPage() {
           (error) => {
             console.warn("Snapshot error en userDoc:", error.message)
           }
+<<<<<<< Updated upstream
         )
         return () => unsubDoc()
+=======
+        }, (err) => {
+          console.warn("User doc snapshot permission or network warning:", err);
+        });
+        return () => unsubDoc();
+>>>>>>> Stashed changes
       } else {
         setUser(null)
         setLoading(false)
@@ -192,6 +199,7 @@ export default function ChatPage() {
 
   // 3. Cargar lista de sesiones (Solo si no está en modo Incógnito estricto y hay usuario)
   useEffect(() => {
+<<<<<<< Updated upstream
     if (!user) return
     const q = query(collection(db, "users", user.uid, "sessions"), orderBy("createdAt", "desc"))
     const unsubscribe = onSnapshot(
@@ -210,9 +218,33 @@ export default function ChatPage() {
     )
     return () => unsubscribe()
   }, [user, privacyTier])
+=======
+    if (!user) return;
+    const q = query(collection(db, "users", user.uid, "sessions"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Session));
+      setSessions(docs);
+      // Si no hay sesión seleccionada y hay sesiones, elegir la primera
+      if (!currentSessionId && docs.length > 0) {
+        setCurrentSessionId(docs[0].id);
+      } else if (docs.length === 0) {
+        setMessages([{
+          id: "welcome",
+          role: "assistant",
+          content: `Hola ${user.displayName || "compañero"}, soy la Dra. Alma de LUMEN. Estoy aquí para apoyarte en tu camino en la **UCC**. Ya sea por estrés académico o algo personal, este es tu espacio seguro. ¿Cómo te sientes hoy?`,
+          timestamp: new Date()
+        }]);
+      }
+    }, (err) => {
+      console.warn("Sessions snapshot permission or network warning:", err);
+    });
+    return () => unsubscribe();
+  }, [user]);
+>>>>>>> Stashed changes
 
   // Crear nueva sesión
   const createNewSession = async () => {
+<<<<<<< Updated upstream
     if (privacyTier === "INCOGNITO") {
       setCurrentSessionId(null)
       setMessages([{
@@ -226,17 +258,41 @@ export default function ChatPage() {
     }
 
     if (!user) return
+=======
+    if (!user) {
+      setMessages([{
+        id: "welcome-guest",
+        role: "assistant",
+        content: "Bienvenido a LUMEN UCC. Como invitado, puedes hablar conmigo de forma privada. ¿Cómo te sientes hoy?",
+        timestamp: new Date()
+      }]);
+      return;
+    }
+>>>>>>> Stashed changes
     const newSession = await addDoc(collection(db, "users", user.uid, "sessions"), {
       title: "Nueva conversación",
       isAnonymous: privacyTier === "ANONIMO",
       alias: privacyTier === "ANONIMO" ? anonymousAlias : (user.displayName || "Identificado"),
       privacyTier: privacyTier,
       createdAt: serverTimestamp(),
+<<<<<<< Updated upstream
     })
     setCurrentSessionId(newSession.id)
     setMessages([])
     setIsSidebarOpen(false)
   }
+=======
+    });
+    setCurrentSessionId(newSession.id);
+    setMessages([{
+      id: "welcome-new",
+      role: "assistant",
+      content: `Hola ${user.displayName || "compañero"}, soy la Dra. Alma de LUMEN. Estoy aquí para apoyarte en tu camino en la **UCC**. Ya sea por estrés académico o algo personal, este es tu espacio seguro. ¿Cómo te sientes hoy?`,
+      timestamp: new Date()
+    }]);
+    setIsSidebarOpen(false);
+  };
+>>>>>>> Stashed changes
 
   // Eliminar sesión individual (Derecho de Supresión / Habeas Data)
   const handleDeleteSession = async (session: Session) => {
@@ -346,7 +402,13 @@ export default function ChatPage() {
       (error) => {
         console.warn("Snapshot error en messages:", error.message)
       }
+<<<<<<< Updated upstream
     )
+=======
+    }, (err) => {
+      console.warn("Messages snapshot permission or network warning:", err);
+    });
+>>>>>>> Stashed changes
 
     return () => unsubscribe()
   }, [user, currentSessionId, privacyTier, anonymousAlias])
@@ -724,19 +786,20 @@ export default function ChatPage() {
             >
               <Menu className="h-6 w-6" />
             </Button>
-            <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/20">
-                <Sparkles className="h-5 w-5" />
+            <Link href="/" className="flex md:hidden items-center gap-3 hover:opacity-80 transition-opacity">
+              <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/20">
+                <Sparkles className="h-4 w-4" />
               </div>
               <div>
-                <h1 className="font-serif font-bold text-lg leading-tight">LUMEN</h1>
-                <p className="text-[10px] text-emerald-500 font-bold flex items-center gap-1">
+                <h1 className="font-serif font-bold text-base leading-tight">LUMEN</h1>
+                <p className="text-[9px] text-emerald-500 font-bold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  BIENESTAR ESTUDIANTIL UCC
+                  UCC
                 </p>
               </div>
             </Link>
           </div>
+<<<<<<< Updated upstream
 
           {/* Badge y Selector de Privacidad / Habeas Data */}
           <div className="flex items-center gap-2 md:gap-3">
@@ -789,15 +852,23 @@ export default function ChatPage() {
               <Settings className="h-3 w-3 opacity-60 ml-0.5" />
             </button>
 
+=======
+          <div className="md:hidden">
+>>>>>>> Stashed changes
             <Link href="/emergency">
               <Button
                 variant="outline"
                 size="sm"
                 className="rounded-xl bg-destructive/5 border-destructive/20 text-destructive hover:bg-destructive/10 text-xs font-bold"
               >
+<<<<<<< Updated upstream
                 <Phone className="h-3 w-3 mr-1 md:mr-2" />
                 <span className="hidden sm:inline">EMERGENCIA</span>
                 <span className="sm:hidden">SOS</span>
+=======
+                <Phone className="h-3 w-3 mr-2" />
+                EMERGENCIA
+>>>>>>> Stashed changes
               </Button>
             </Link>
           </div>
@@ -831,8 +902,13 @@ export default function ChatPage() {
           </div>
         )}
 
+<<<<<<< Updated upstream
         {/* Mensajes del Chat */}
         <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6">
+=======
+        {/* Messages List */}
+        <div className="flex-1 overflow-y-auto px-4 md:px-8 pt-6 md:pt-10 pb-6 space-y-6">
+>>>>>>> Stashed changes
           <div className="max-w-3xl mx-auto w-full">
             <AnimatePresence initial={false}>
               {messages.map((message) => (

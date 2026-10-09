@@ -208,6 +208,7 @@ export default function AlertsDashboard() {
 
       const q = query(historyPath, orderBy("timestamp", "asc"));
 
+<<<<<<< Updated upstream
       const unsub = onSnapshot(
         q,
         (snapshot) => {
@@ -219,6 +220,15 @@ export default function AlertsDashboard() {
           setSelectedUserHistory([]);
         }
       );
+=======
+      const unsub = onSnapshot(q, (snapshot) => {
+        const history = snapshot.docs.map(doc => doc.data()) as Message[];
+        setSelectedUserHistory(history);
+      }, (err) => {
+        console.warn("History snapshot error:", err);
+        setSelectedUserHistory([]);
+      });
+>>>>>>> Stashed changes
 
       setHistoryUnsubscribe(() => unsub);
     } catch (error) {
